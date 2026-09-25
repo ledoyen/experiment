@@ -1,0 +1,25 @@
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #f8fafc; background: #0b0f0c; }
+* { box-sizing: border-box; }
+html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; }
+.world { position:fixed; inset:0; width:100vw; height:100vh; touch-action:none; }
+.ui { position:fixed; inset:0; pointer-events:none; }
+.panel,.drawer,.timebar { pointer-events:auto; }
+.panel { position:absolute; top:14px; left:14px; width:340px; padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:12px; background:rgba(13,20,15,.9); backdrop-filter:blur(10px); }
+.panel header,.drawer-body header { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
+#line { width:100%; height:145px; display:block; border-radius:8px; }
+#hist { width:100%; height:90px; display:block; border-radius:8px; margin-top:8px; }
+.choices { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:11px; }
+.choices label { display:flex; align-items:center; gap:4px; }
+.drawer { position:absolute; top:0; right:0; bottom:0; width:50px; background:rgba(13,20,15,.92); border-left:1px solid rgba(255,255,255,.1); transition:width .18s ease; }
+.drawer.open { width:320px; }
+#drawer-toggle { width:38px; height:38px; margin:10px 6px; border:0; border-radius:8px; background:#202b22; color:#fff; cursor:pointer; }
+.drawer-body { display:none; padding:0 16px 16px; }
+.drawer.open .drawer-body { display:block; }
+.range { display:grid; grid-template-columns:1fr auto; gap:5px; margin:14px 0; font-size:12px; }
+.range input { grid-column:1/-1; width:100%; }
+.range output { color:#a7f3d0; }
+.switch { display:flex; gap:7px; align-items:center; margin:16px 0; font-size:12px; }
+#restart { width:100%; padding:10px; border:0; border-radius:8px; background:#67e27a; color:#08240d; font-weight:800; cursor:pointer; }
+.timebar { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; gap:6px; align-items:center; padding:7px; border:1px solid rgba(255,255,255,.1); border-radius:11px; background:rgba(13,20,15,.9); }
+.timebar button { width:36px; height:30px; border:0; border-radius:7px; background:#202b22; color:#fff; cursor:pointer; }
+#clock { min-width:180px; text-align:center; font-size:11px; color:#d1d5db; }
