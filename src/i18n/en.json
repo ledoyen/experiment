@@ -1,0 +1,21 @@
+{
+  "charts": "Indicators",
+  "parameters": "Parameters",
+  "medianWealth": "Median wealth",
+  "gini": "Wealth concentration",
+  "foodPrice": "Food price",
+  "wealthDistribution": "Wealth distribution",
+  "productivityDistribution": "Productivity distribution",
+  "population": "Population",
+  "money": "Money",
+  "initialMoney": "Initial money",
+  "mobility": "Job mobility",
+  "priceSensitivity": "Price sensitivity",
+  "productivityVariance": "Productivity variance",
+  "restart": "Restart simulation",
+  "rewind": "Rewind",
+  "pause": "Pause",
+  "play": "Play",
+  "speed": "Speed",
+  "day": "day"
+}
