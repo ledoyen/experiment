@@ -17,5 +17,8 @@
   "pause": "Pause",
   "play": "Lecture",
   "speed": "Vitesse",
-  "day": "jour"
+  "day": "jour",
+  "min": "min",
+  "max": "max",
+  "median": "med"
 }
