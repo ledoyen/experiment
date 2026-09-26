@@ -35,9 +35,16 @@ const gini = (v: number[]) => {
 const bins = (v: number[], n = 8) => {
   const result = Array(n).fill(0);
   if (!v.length) return result;
-  const min = Math.min(...v), max = Math.max(...v);
-  if (min === max) { result[0] = v.length; return result; }
-  for (const x of v) result[Math.min(n - 1, Math.floor((x - min) / ((max - min) / n)))]++;
+  const min = Math.min(...v);
+  const max = Math.max(...v);
+  if (min === max) {
+    result[0] = v.length;
+    return result;
+  }
+  const width = (max - min) / n;
+  for (const x of v) {
+    result[Math.min(n - 1, Math.floor((x - min) / width))]++;
+  }
   return result;
 };
 
@@ -48,6 +55,7 @@ export class World {
   foodPrice = 1;
   agents: Agent[] = [];
   parameters: Parameters;
+
   private history: Metrics[] = [];
   private snapshots: { minute: number; foodPrice: number; agents: Agent[] }[] = [];
 
@@ -81,11 +89,19 @@ export class World {
   }
 
   step(minutes = 1) {
-    for (let i = 0; i < minutes; i++) {
-      this.minute++;
-      if (this.parameters.moneyEnabled) this.stepMarket();
-      this.stepMovement();
-      if (this.minute % 10 === 0) this.capture();
+    let remaining = Math.max(0, Math.floor(minutes));
+
+    while (remaining > 0) {
+      const nextCapture = this.nextCaptureMinute();
+      const untilCapture = Math.max(1, nextCapture - this.minute);
+      const chunk = Math.min(remaining, untilCapture);
+
+      this.advanceChunk(chunk);
+      remaining -= chunk;
+
+      if (this.minute === nextCapture) {
+        this.capture();
+      }
     }
   }
 
@@ -93,6 +109,7 @@ export class World {
     const target = Math.max(0, this.minute - minutes);
     const snap = [...this.snapshots].reverse().find(s => s.minute <= target);
     if (!snap) return;
+
     this.minute = snap.minute;
     this.foodPrice = snap.foodPrice;
     this.agents = structuredClone(snap.agents);
@@ -101,6 +118,12 @@ export class World {
 
   getMetrics(): Metrics {
     const wealth = this.agents.map(a => a.money);
+    const productivity = this.agents.map(a => a.productivity);
+    const wealthMin = Math.min(...wealth);
+    const wealthMax = Math.max(...wealth);
+    const productivityMin = Math.min(...productivity);
+    const productivityMax = Math.max(...productivity);
+
     return {
       minute: this.minute,
       population: this.agents.length,
@@ -108,40 +131,133 @@ export class World {
       gini: gini(wealth),
       foodPrice: this.foodPrice,
       wealthBins: bins(wealth),
-      productivityBins: bins(this.agents.map(a => a.productivity))
+      wealthMin,
+      wealthMax,
+      productivityBins: bins(productivity),
+      productivityMin,
+      productivityMax
     };
   }
 
-  getHistory() { return [...this.history]; }
-  color(job: Job) { return jobColor[job]; }
+  getHistory(): Metrics[] {
+    return [...this.history];
+  }
+
+  getDisplayHistory(speed: number): Metrics[] {
+    const interval =
+      speed >= 1000 ? 1440 :
+      speed >= 100 ? 120 :
+      speed >= 10 ? 30 :
+      10;
+
+    const result: Metrics[] = [];
+    for (const point of this.history) {
+      if (point.minute % interval === 0) {
+        result.push(point);
+      }
+    }
+
+    const last = this.history[this.history.length - 1];
+    if (last && result[result.length - 1] !== last) {
+      result.push(last);
+    }
+
+    return result;
+  }
+
+  getJobCounts(): Record<Job, number> {
+    const counts: Record<Job, number> = {
+      farmer: 0,
+      forester: 0,
+      fisher: 0,
+      builder: 0
+    };
+
+    for (const agent of this.agents) counts[agent.job]++;
+    return counts;
+  }
+
+  color(job: Job) {
+    return jobColor[job];
+  }
 
   private capture() {
     this.history.push(this.getMetrics());
+    this.compactHistory();
+
     this.snapshots.push({
       minute: this.minute,
       foodPrice: this.foodPrice,
       agents: structuredClone(this.agents)
     });
-    if (this.history.length > 900) this.history.shift();
+
     if (this.snapshots.length > 180) this.snapshots.shift();
   }
 
-  private stepMarket() {
-    const noise = 1 + (Math.random() - 0.5) * 0.08;
-    this.foodPrice *= Math.exp(this.parameters.priceSensitivity * (noise - 1));
-    this.foodPrice = Math.max(0.15, Math.min(8, this.foodPrice));
-    for (const a of this.agents) {
-      a.money += jobFactor[a.job] * a.productivity * this.foodPrice / 60;
-      if (Math.random() < this.parameters.mobility / 1440) {
-        a.job = jobs[Math.floor(Math.random() * jobs.length)];
+  private compactHistory() {
+    const now = this.minute;
+    const buckets = new Map<string, Metrics>();
+
+    for (const metric of this.history) {
+      const age = now - metric.minute;
+      let key: string;
+
+      if (age < 60) {
+        // Current hour: 10-minute resolution.
+        key = `m10:${metric.minute}`;
+      } else if (age < 1440) {
+        // Earlier hours of the current day: one point per hour.
+        key = `h:${Math.floor(metric.minute / 60)}`;
+      } else if (age < 43200) {
+        // Earlier days of the current 30-day simulation month.
+        key = `d:${Math.floor(metric.minute / 1440)}`;
+      } else {
+        // Older history: one representative point per 30-day month, forever.
+        key = `mo:${Math.floor(metric.minute / 43200)}`;
       }
+
+      const existing = buckets.get(key);
+      if (!existing || metric.minute > existing.minute) {
+        buckets.set(key, metric);
+      }
+    }
+
+    this.history = [...buckets.values()].sort((a, b) => a.minute - b.minute);
+  }
+
+  private nextCaptureMinute(): number {
+    const next = Math.floor(this.minute / 10) * 10 + 10;
+    return Math.max(this.minute + 1, next);
+  }
+
+  private advanceChunk(minutes: number) {
+    this.minute += minutes;
+
+    if (this.parameters.moneyEnabled) {
+      this.stepMarket(minutes);
+    }
+
+    // Movement is cosmetic: aggregate it instead of simulating every minute.
+    const distance = Math.sqrt(minutes) * 0.9;
+    for (const a of this.agents) {
+      a.x = Math.max(20, Math.min(this.width - 20, a.x + (Math.random() - 0.5) * distance));
+      a.y = Math.max(20, Math.min(this.height - 20, a.y + (Math.random() - 0.5) * distance));
     }
   }
 
-  private stepMovement() {
+  private stepMarket(minutes: number) {
+    const noise = 1 + (Math.random() - 0.5) * 0.08 * Math.sqrt(minutes);
+    this.foodPrice *= Math.exp(this.parameters.priceSensitivity * (noise - 1));
+    this.foodPrice = Math.max(0.15, Math.min(8, this.foodPrice));
+
+    const switchProbability = 1 - Math.pow(1 - this.parameters.mobility / 1440, minutes);
+
     for (const a of this.agents) {
-      a.x = Math.max(20, Math.min(this.width - 20, a.x + (Math.random() - .5) * .9));
-      a.y = Math.max(20, Math.min(this.height - 20, a.y + (Math.random() - .5) * .9));
+      a.money += jobFactor[a.job] * a.productivity * this.foodPrice / 60 * minutes;
+
+      if (Math.random() < switchProbability) {
+        a.job = jobs[Math.floor(Math.random() * jobs.length)];
+      }
     }
   }
 
