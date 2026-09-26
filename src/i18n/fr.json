@@ -20,5 +20,10 @@
   "day": "jour",
   "min": "min",
   "max": "max",
-  "median": "med"
+  "median": "med",
+  "count": "Nombre",
+  "job.farmer": "Agriculture",
+  "job.forester": "Sylviculture",
+  "job.fisher": "Pêche",
+  "job.builder": "Construction"
 }
