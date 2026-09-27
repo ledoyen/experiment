@@ -25,6 +25,8 @@ export interface Metrics {
   gini: number;
   foodPrice: number;
   wealthBins: number[];
+  wealthBinSums: number[];
+  wealthTotal: number;
   wealthMin: number;
   wealthMax: number;
   productivityBins: number[];
