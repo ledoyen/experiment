@@ -1,4 +1,4 @@
-import type { Parameters, Metrics } from "../data/types";
+import type { Parameters, Metrics, Agent } from "../data/types";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
@@ -74,6 +74,7 @@ export class AppUi {
       </section>
 
       <div id="population-legend" class="population-legend"></div>
+      <div id="agent-tooltip" class="agent-tooltip" hidden></div>
 
       <aside class="drawer">
         <button id="drawer-toggle">⚙</button>
@@ -99,6 +100,10 @@ export class AppUi {
         <button data-speed="1000">×1000</button>
         <span id="clock"></span>
       </nav>`;
+
+    this.view.setAgentHoverHandler((agent, screenX, screenY) => {
+      this.updateAgentTooltip(agent, screenX, screenY);
+    });
 
     this.bind();
     this.render();
@@ -238,6 +243,27 @@ export class AppUi {
     }
 
     this.view.render();
+  }
+
+  private updateAgentTooltip(agent: Agent | null, screenX: number, screenY: number) {
+    const tooltip = this.ui.querySelector<HTMLDivElement>("#agent-tooltip");
+    if (!tooltip) return;
+
+    if (!agent) {
+      tooltip.hidden = true;
+      return;
+    }
+
+    tooltip.hidden = false;
+    const width = 220;
+    tooltip.style.left = `${Math.min(window.innerWidth - width - 12, screenX + 14)}px`;
+    tooltip.style.top = `${Math.min(window.innerHeight - 150, Math.max(12, screenY + 14))}px`;
+    tooltip.innerHTML = `
+      <div class="agent-tooltip-title">#${agent.id}</div>
+      <div class="agent-row"><span>${t("job")}</span><strong>${t(`job.${agent.job}`)}</strong></div>
+      <div class="agent-row"><span>${t("productivity")}</span><strong>${formatValue(agent.productivity)}</strong></div>
+      <div class="agent-row"><span>${t("money")}</span><strong>${formatValue(agent.money)}</strong></div>
+      <div class="agent-row"><span>${t("position")}</span><strong>${Math.round(agent.x)}, ${Math.round(agent.y)}</strong></div>`;
   }
 
   private renderLegend(history: Metrics[]) {
@@ -418,8 +444,9 @@ function renderHistogram(
     tooltip.style.top = "4px";
     tooltip.innerHTML = `
       <div class="tooltip-time">${t(histogram === "wealthBins" ? "wealthDistribution" : "productivityDistribution")}</div>
-      <div class="tooltip-row"><span>${t("count")}</span><strong>${count}</strong></div>
-      <div class="tooltip-row"><span>${formatValue(low)} – ${formatValue(high)}</span><strong>${((count / Math.max(1, metric.population)) * 100).toFixed(1)}%</strong></div>
+      <div class="tooltip-row"><span>${t("range")}</span><strong>${formatValue(low)} – ${formatValue(high)}</strong></div>
+      <div class="tooltip-row"><span>${t("individuals")}</span><strong>${count}</strong></div>
+      <div class="tooltip-row"><span>${t("share")}</span><strong>${((count / Math.max(1, metric.population)) * 100).toFixed(1)} %</strong></div>
     `;
   }
 }
