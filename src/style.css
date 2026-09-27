@@ -127,7 +127,10 @@ html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; }
 }
 
 .agent-tooltip {
-  min-width:220px;
+  width:300px;
+  max-height:72vh;
+  overflow-y:auto;
+  min-width:260px;
   z-index:30;
 }
 .agent-tooltip-title {
@@ -141,6 +144,48 @@ html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; }
   grid-template-columns:1fr auto;
   gap:10px;
   margin:4px 0;
+}
+.physiology-gauges {
+  margin-top:9px;
+  padding-top:7px;
+  border-top:1px solid rgba(255,255,255,.1);
+}
+.phys-section-title {
+  margin:8px 0 5px;
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:#a7f3d0;
+}
+.phys-gauge { margin:5px 0; }
+.phys-gauge-head {
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:baseline;
+  font-size:9px;
+}
+.phys-gauge-head span {
+  color:#d1d5db;
+  min-width:0;
+}
+.phys-gauge-head strong {
+  white-space:nowrap;
+  font-size:8px;
+}
+.phys-gauge-track {
+  height:5px;
+  margin-top:3px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.1);
+}
+.phys-gauge-fill {
+  height:100%;
+  border-radius:inherit;
+  background:#7dd3a8;
+  transition:width .12s linear;
 }
 
 .drawer {
