@@ -32,5 +32,6 @@
   "productivity": "Productivity",
   "position": "Position",
   "initialMoneyPerIndividual": "Initial money / individual",
-  "fortuneSum": "Total wealth"
+  "fortuneSum": "Total wealth",
+  "moneySupply": "Money supply"
 }
