@@ -1,17 +1,34 @@
-import type { Parameters, Metrics, Agent } from "../data/types";
+import type { Parameters, Metrics, Agent, Good } from "../data/types";
+import { CONSUMED_GOODS, GOODS } from "../data/economy";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 
-type SeriesKey = "medianWealth" | "gini" | "foodPrice" | "moneySupply";
+type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply";
+type SeriesKey = BaseSeriesKey | `price:${Good}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
-const SERIES_COLORS: Record<SeriesKey, string> = {
+const SERIES_COLORS: Record<string, string> = {
   medianWealth: "#9fe870",
   gini: "#f4b942",
-  foodPrice: "#72b7ff",
   moneySupply: "#d1d5db"
 };
+
+const PRICE_COLORS = ["#72b7ff", "#8dd3c7", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#bc80bd", "#ccebc5", "#ffed6f", "#a6cee3"];
+
+function seriesColor(key: SeriesKey): string {
+  if (key.startsWith("price:")) {
+    const good = key.slice(6) as Good;
+    const index = GOODS.indexOf(good);
+    return PRICE_COLORS[index % PRICE_COLORS.length];
+  }
+  return SERIES_COLORS[key];
+}
+
+function seriesValue(point: Metrics, key: SeriesKey): number {
+  if (key.startsWith("price:")) return point.prices[key.slice(6) as Good];
+  return Number(point[key as BaseSeriesKey]);
+}
 
 const formatValue = (value: number) => {
   if (Math.abs(value) >= 1000) return value.toFixed(0);
@@ -30,7 +47,7 @@ export class AppUi {
   private readonly ui: HTMLDivElement;
   private running = true;
   private speed = 1;
-  private series = new Set<SeriesKey>(["medianWealth", "gini", "foodPrice", "moneySupply"]);
+  private series = new Set<SeriesKey>(["medianWealth", "gini", "moneySupply", "price:ble"]);
   private histogram: HistogramKey = "wealthBins";
   private hoverX: number | null = null;
   private histogramHoverX: number | null = null;
@@ -65,9 +82,15 @@ export class AppUi {
         <div class="choices">
           ${this.check("medianWealth", "medianWealth")}
           ${this.check("gini", "gini")}
-          ${this.check("foodPrice", "foodPrice")}
           ${this.check("moneySupply", "moneySupply")}
+          ${this.check("price:ble", "good.ble")}
         </div>
+        <details class="price-choices">
+          <summary>${t("price")} — ${t("charts")}</summary>
+          <div class="choices">
+            ${CONSUMED_GOODS.map(good => this.check(("price:" + good) as SeriesKey, "good." + good)).join("")}
+          </div>
+        </details>
 
         <div class="choices">
           <label><input type="radio" name="hist" value="wealthBins" checked> ${t("wealthDistribution")}</label>
@@ -112,7 +135,7 @@ export class AppUi {
   }
 
   private check(key: SeriesKey, label: string) {
-    return `<label><input type="checkbox" data-series="${key}" checked> <span class="series-dot" style="--series-color:${SERIES_COLORS[key]}"></span>${t(label)}</label>`;
+    return `<label><input type="checkbox" data-series="${key}" ${this.series.has(key) ? "checked" : ""}> <span class="series-dot" style="--series-color:${seriesColor(key)}"></span>${t(label)}</label>`;
   }
 
   private range(id: keyof Parameters, label: string, min: number, max: number, value: number, step: number) {
@@ -282,7 +305,7 @@ export class AppUi {
     if (!root) return;
 
     root.innerHTML = [...this.series].map(key => {
-      const values = history.map(point => Number(point[key]));
+      const values = history.map(point => seriesValue(point, key));
       const min = values.length ? Math.min(...values) : 0;
       const max = values.length ? Math.max(...values) : 0;
       const med = median(values);
@@ -303,12 +326,14 @@ export class AppUi {
     const counts = this.world.getJobCounts();
     const jobs = Object.keys(counts) as Array<keyof typeof counts>;
 
-    root.innerHTML = jobs.map(job => `
-      <div class="population-job">
-        <span class="job-dot" style="--job-color:${this.world.color(job)}"></span>
-        <span>${t(`job.${job}`)}</span>
-        <strong>${counts[job]}</strong>
-      </div>`).join("");
+    root.innerHTML = jobs
+      .filter(job => counts[job] > 0)
+      .map(job => `
+        <div class="population-job">
+          <span class="job-dot" style="--job-color:${this.world.color(job)}"></span>
+          <span>${t(`job.${job}`)}</span>
+          <strong>${counts[job]}</strong>
+        </div>`).join("");
   }
 }
 
@@ -344,14 +369,11 @@ function renderLineChart(
 
   if (history.length < 2 || !keys.length) return;
 
-  const palette: Record<SeriesKey, string> = {
-    medianWealth: "#9fe870",
-    gini: "#f4b942",
-    foodPrice: "#72b7ff",
-    moneySupply: "#d1d5db"
-  };
+  const palette: Record<string, string> = Object.fromEntries(
+    keys.map(key => [key, seriesColor(key)])
+  );
 
-  const values = history.flatMap(point => keys.map(key => Number(point[key])));
+  const values = history.flatMap(point => keys.map(key => seriesValue(point, key)));
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1e-9, max - min);
@@ -387,7 +409,7 @@ function renderLineChart(
     ctx.stroke();
 
     if (hoverX !== null) {
-      const value = Number(hoverPoint[key]);
+      const value = seriesValue(hoverPoint, key);
       const py = h - 6 - (value - min) / span * (h - 12);
 
       ctx.fillStyle = palette[key];
