@@ -1,5 +1,6 @@
 import type { Parameters, Metrics, Agent, Good } from "../data/types";
 import { CONSUMED_GOODS, GOODS } from "../data/economy";
+import { NUTRITION, type NutritionId } from "../data/nutrition";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
@@ -38,6 +39,13 @@ function seriesLabel(key: SeriesKey): string {
 const formatValue = (value: number) => {
   if (Math.abs(value) >= 1000) return value.toFixed(0);
   if (Math.abs(value) >= 100) return value.toFixed(1);
+  return value.toFixed(2);
+};
+
+const formatReserve = (value: number) => {
+  if (Math.abs(value) >= 1000) return value.toFixed(0);
+  if (Math.abs(value) >= 100) return value.toFixed(1);
+  if (Math.abs(value) >= 10) return value.toFixed(2);
   return value.toFixed(2);
 };
 
@@ -296,13 +304,56 @@ export class AppUi {
     tooltip.hidden = false;
     const width = 220;
     tooltip.style.left = `${Math.min(window.innerWidth - width - 12, screenX + 14)}px`;
-    tooltip.style.top = `${Math.min(window.innerHeight - 150, Math.max(12, screenY + 14))}px`;
+    const width = 300;
+    tooltip.style.left = `${Math.min(window.innerWidth - width - 12, Math.max(8, screenX + 14))}px`;
+    tooltip.style.top = `${Math.min(window.innerHeight - 12, Math.max(12, screenY + 14))}px`;
+
+    const sections: Array<{ title: string; ids: NutritionId[] }> = [
+      {
+        title: t("phys.section.energy"),
+        ids: ["energy"]
+      },
+      {
+        title: t("phys.section.macros"),
+        ids: ["protein", "carbohydrate", "fat", "fiber"]
+      },
+      {
+        title: t("phys.section.vitamins"),
+        ids: ["vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3", "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C", "vitamin_E", "vitamin_K"]
+      },
+      {
+        title: t("phys.section.minerals"),
+        ids: ["calcium", "iron", "magnesium", "zinc", "iodine", "selenium"]
+      }
+    ];
+
     tooltip.innerHTML = `
       <div class="agent-tooltip-title">#${agent.id}</div>
+      <div class="agent-row"><span>${t("sex")}</span><strong>${t(`sex.${agent.sex}`)}</strong></div>
+      <div class="agent-row"><span>${t("physiologyState")}</span><strong>${t(`physiology.${agent.physiologyState}`)}</strong></div>
       <div class="agent-row"><span>${t("job")}</span><strong>${t(`job.${agent.job}`)}</strong></div>
       <div class="agent-row"><span>${t("productivity")}</span><strong>${formatValue(agent.productivity)}</strong></div>
       <div class="agent-row"><span>${t("money")}</span><strong>${formatValue(agent.money)}</strong></div>
-      <div class="agent-row"><span>${t("position")}</span><strong>${Math.round(agent.x)}, ${Math.round(agent.y)}</strong></div>`;
+      <div class="agent-row"><span>${t("position")}</span><strong>${Math.round(agent.x)}, ${Math.round(agent.y)}</strong></div>
+      <div class="physiology-gauges">
+        ${sections.map(section => `
+          <div class="phys-section-title">${section.title}</div>
+          ${section.ids.map(id => {
+            const reserve = agent.nutrition[id];
+            const percent = reserve.max > 0 ? Math.max(0, Math.min(100, reserve.value / reserve.max * 100)) : 0;
+            return `
+              <div class="phys-gauge">
+                <div class="phys-gauge-head">
+                  <span>${t(reserve.labelKey)}</span>
+                  <strong>${formatReserve(reserve.value)} ${reserve.unit} · ${percent.toFixed(0)}%</strong>
+                </div>
+                <div class="phys-gauge-track">
+                  <div class="phys-gauge-fill" style="width:${percent}%"></div>
+                </div>
+              </div>`;
+          }).join("")}
+        `).join("")}
+      </div>`;
   }
 
   private renderLegend(history: Metrics[]) {
