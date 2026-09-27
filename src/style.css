@@ -246,3 +246,8 @@ html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; }
   font-size:11px;
   color:#d1d5db;
 }
+
+.price-choices { margin-top:8px; font-size:11px; }
+.price-choices summary { cursor:pointer; color:#cbd5e1; }
+.price-choices .choices { max-height:120px; overflow:auto; padding:5px 0; }
+.population-legend { max-height:50vh; overflow-y:auto; }
