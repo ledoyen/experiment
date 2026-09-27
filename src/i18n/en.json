@@ -25,5 +25,11 @@
   "job.farmer": "Farming",
   "job.forester": "Forestry",
   "job.fisher": "Fishing",
-  "job.builder": "Construction"
+  "job.builder": "Construction",
+  "range": "Range",
+  "individuals": "Individuals",
+  "share": "Population share",
+  "job": "Job",
+  "productivity": "Productivity",
+  "position": "Position"
 }
