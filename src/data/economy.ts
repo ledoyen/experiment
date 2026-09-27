@@ -44,7 +44,7 @@ export const INITIAL_PRICE: Record<Good, number> = Object.fromEntries(
   GOODS.map(good => [good, (RAW_INITIAL_PRICE[good] ?? 0) * 100 / referenceBasketCost])
 ) as Record<Good, number>;
 
-export const ACTIVITIES: ActivityDefinition[] = [
+const activityRows: Array<[Exclude<Job, "idle">, string, Good, number, number, string, boolean?]> = [
   ["agriculture_ble", "job.agriculture_ble", "ble", 164.25, 109500, "agriculture"],
   ["agriculture_pomme_de_terre", "job.agriculture_pomme_de_terre", "pomme_de_terre", 16.425, 109500, "agriculture"],
   ["agriculture_legumineuses", "job.agriculture_legumineuses", "legumineuses", 54.75, 36500, "agriculture"],
@@ -59,9 +59,13 @@ export const ACTIVITIES: ActivityDefinition[] = [
   ["construction", "job.construction", "logement", 25, 333.3333333333333, "construction", true],
   ["bois_chauffage", "job.bois_chauffage", "chauffage", 50, 1000, "foresterie"],
   ["outillage", "job.outillage", "outil", 3, 300, "artisanat"]
-].map(([job, labelKey, output, referenceEtp, annualOutputFor1000, competence, dormant]) => ({
-  job: job as Exclude<Job, "idle">, labelKey, output: output as Good, referenceEtp, annualOutputFor1000, competence, dormant
-}));
+];
+
+export const ACTIVITIES: ActivityDefinition[] = activityRows.map(
+  ([job, labelKey, output, referenceEtp, annualOutputFor1000, competence, dormant]) => ({
+    job, labelKey, output, referenceEtp, annualOutputFor1000, competence, dormant
+  })
+);
 
 export const ACTIVE_REFERENCE_ETP = ACTIVITIES
   .filter(activity => !activity.dormant && activity.referenceEtp > 0)
