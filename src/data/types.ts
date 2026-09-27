@@ -1,4 +1,5 @@
 export type Job = "farmer" | "forester" | "fisher";
+export type Good = "food" | "wood" | "fish";
 
 export interface Parameters {
   population: number;
@@ -24,6 +25,8 @@ export interface Metrics {
   medianWealth: number;
   gini: number;
   foodPrice: number;
+  moneySupply: number;
+  prices: Record<Good, number>;
   wealthBins: number[];
   wealthBinSums: number[];
   wealthTotal: number;
