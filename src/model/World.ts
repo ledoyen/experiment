@@ -2,12 +2,6 @@ import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 
 const jobs: Job[] = ["farmer", "forester", "fisher"];
 
-const jobFactor: Record<Job, number> = {
-  farmer: 1.25,
-  forester: 0.95,
-  fisher: 0.85
-};
-
 const jobGood: Record<Job, Good> = {
   farmer: "food",
   forester: "wood",
@@ -16,8 +10,8 @@ const jobGood: Record<Job, Good> = {
 
 const jobColor: Record<Job, string> = {
   farmer: "#8ba86c",
-  forester: "#5d91b8",
-  fisher: "#b27a4e"
+  forester: "#4e7650",
+  fisher: "#5d91b8"
 };
 
 const dailyNeed: Record<Good, number> = {
@@ -324,32 +318,39 @@ export class World {
   }
 
   private advanceChunk(minutes: number) {
+    const previousMinute = this.minute;
     this.minute += minutes;
 
     if (this.parameters.moneyEnabled) {
-      this.stepMarket(minutes);
+      const previousDay = Math.floor(previousMinute / 1440);
+      const currentDay = Math.floor(this.minute / 1440);
+      const daysElapsed = currentDay - previousDay;
+
+      for (let day = 0; day < daysElapsed; day++) {
+        this.processMarketDay();
+      }
     }
 
     const distance = Math.sqrt(minutes) * 0.9;
 
     for (const agent of this.agents) {
-      agent.x = Math.max(20, Math.min(this.width - 20, agent.x + (Math.random() - 0.5) * distance));
-      agent.y = Math.max(20, Math.min(this.height - 20, agent.y + (Math.random() - 0.5) * distance));
+      agent.x = Math.max(
+        20,
+        Math.min(this.width - 20, agent.x + (Math.random() - 0.5) * distance)
+      );
+      agent.y = Math.max(
+        20,
+        Math.min(this.height - 20, agent.y + (Math.random() - 0.5) * distance)
+      );
     }
-  }
-
-  private stepMarket(minutes: number) {
-    const days = Math.max(1, Math.floor(minutes / 1440));
-
-    for (let day = 0; day < days; day++) {
-      this.processMarketDay();
-    }
-
-    this.foodPrice = this.prices.food;
   }
 
   private processMarketDay() {
-    const supplies: Record<Good, number> = { food: 0, wood: 0, fish: 0 };
+    const supplies: Record<Good, number> = {
+      food: 0,
+      wood: 0,
+      fish: 0
+    };
 
     for (const agent of this.agents) {
       const good = jobGood[agent.job];
@@ -362,85 +363,115 @@ export class World {
       fish: dailyNeed.fish * this.agents.length
     };
 
-    // Demand is first constrained by each person's available money.
-    const desiredCosts = this.agents.map(agent =>
-      (dailyNeed.food * this.prices.food) +
-      (dailyNeed.wood * this.prices.wood) +
-      (dailyNeed.fish * this.prices.fish)
+    const requiredCost =
+      dailyNeed.food * this.prices.food +
+      dailyNeed.wood * this.prices.wood +
+      dailyNeed.fish * this.prices.fish;
+
+    // Every individual tries to buy the same essential basket.
+    // Their available money limits effective demand, but purchases remain
+    // transfers between agents: no new money enters the system.
+    const affordability = this.agents.map(agent =>
+      Math.min(1, agent.money / Math.max(1e-9, requiredCost))
     );
 
-    const affordability = this.agents.map((agent, index) =>
-      Math.min(1, agent.money / Math.max(1e-9, desiredCosts[index]))
-    );
-
+    const affordabilitySum = affordability.reduce((sum, value) => sum + value, 0);
     const effectiveDemand: Record<Good, number> = {
-      food: dailyNeed.food * affordability.reduce((sum, value) => sum + value, 0),
-      wood: dailyNeed.wood * affordability.reduce((sum, value) => sum + value, 0),
-      fish: dailyNeed.fish * affordability.reduce((sum, value) => sum + value, 0)
+      food: dailyNeed.food * affordabilitySum,
+      wood: dailyNeed.wood * affordabilitySum,
+      fish: dailyNeed.fish * affordabilitySum
     };
 
-    const saleRatio: Record<Good, number> = {
-      food: Math.min(1, supplies.food > 0 ? effectiveDemand.food / supplies.food : 0),
-      wood: Math.min(1, supplies.wood > 0 ? effectiveDemand.wood / supplies.wood : 0),
-      fish: Math.min(1, supplies.fish > 0 ? effectiveDemand.fish / supplies.fish : 0)
+    const purchaseFraction: Record<Good, number> = {
+      food: Math.min(
+        1,
+        effectiveDemand.food > 0 ? supplies.food / effectiveDemand.food : 0
+      ),
+      wood: Math.min(
+        1,
+        effectiveDemand.wood > 0 ? supplies.wood / effectiveDemand.wood : 0
+      ),
+      fish: Math.min(
+        1,
+        effectiveDemand.fish > 0 ? supplies.fish / effectiveDemand.fish : 0
+      )
     };
 
-    const purchaseRatio: Record<Good, number> = {
-      food: Math.min(1, supplies.food > 0 ? effectiveDemand.food / Math.max(requiredDemand.food, 1e-9) : 0),
-      wood: Math.min(1, supplies.wood > 0 ? effectiveDemand.wood / Math.max(requiredDemand.wood, 1e-9) : 0),
-      fish: Math.min(1, supplies.fish > 0 ? effectiveDemand.fish / Math.max(requiredDemand.fish, 1e-9) : 0)
+    const saleFraction: Record<Good, number> = {
+      food: Math.min(
+        1,
+        supplies.food > 0 ? effectiveDemand.food * purchaseFraction.food / supplies.food : 0
+      ),
+      wood: Math.min(
+        1,
+        supplies.wood > 0 ? effectiveDemand.wood * purchaseFraction.wood / supplies.wood : 0
+      ),
+      fish: Math.min(
+        1,
+        supplies.fish > 0 ? effectiveDemand.fish * purchaseFraction.fish / supplies.fish : 0
+      )
     };
 
-    // SELL: money moves from buyers to the people producing the purchased good.
+    // Buyers spend only what they can afford and receive the same fraction
+    // of each essential good when the market is physically constrained.
+    for (let index = 0; index < this.agents.length; index++) {
+      const agent = this.agents[index];
+      const ratioByBudget = affordability[index];
+
+      const purchaseRatio = {
+        food: ratioByBudget * purchaseFraction.food,
+        wood: ratioByBudget * purchaseFraction.wood,
+        fish: ratioByBudget * purchaseFraction.fish
+      };
+
+      const spend =
+        dailyNeed.food * this.prices.food * purchaseRatio.food +
+        dailyNeed.wood * this.prices.wood * purchaseRatio.wood +
+        dailyNeed.fish * this.prices.fish * purchaseRatio.fish;
+
+      agent.money = Math.max(0, agent.money - spend);
+    }
+
+    // Sellers receive exactly the money spent on the goods they produced.
     for (const agent of this.agents) {
       const good = jobGood[agent.job];
       const production = baseProductionPerDay[agent.job] * agent.productivity;
-      agent.money += production * this.prices[good] * saleRatio[good];
+      agent.money += production * this.prices[good] * saleFraction[good];
     }
 
-    // BUY: money leaves each buyer. No money is created here.
-    for (const agent of this.agents) {
-      const budget = agent.money;
-      const ratio = Math.min(
-        affordability[this.agents.indexOf(agent)],
-        purchaseRatio.food,
-        purchaseRatio.wood,
-        purchaseRatio.fish
-      );
-
-      const spend =
-        dailyNeed.food * this.prices.food * ratio +
-        dailyNeed.wood * this.prices.wood * ratio +
-        dailyNeed.fish * this.prices.fish * ratio;
-
-      agent.money = Math.max(0, budget - spend);
-    }
-
-    // Prices respond to physical demand versus physical supply.
-    const priceStep = this.parameters.priceSensitivity;
+    // Prices react to effective demand vs available supply.
     for (const good of ["food", "wood", "fish"] as Good[]) {
-      const ratio = requiredDemand[good] / Math.max(supplies[good], 1e-9);
-      const bounded = Math.max(-0.25, Math.min(0.25, ratio - 1));
-      this.prices[good] *= Math.exp(priceStep * bounded);
+      const demandSupplyRatio =
+        effectiveDemand[good] / Math.max(supplies[good], 1e-9);
+      const bounded = Math.max(-0.25, Math.min(0.25, demandSupplyRatio - 1));
+
+      this.prices[good] *= Math.exp(this.parameters.priceSensitivity * bounded);
       this.prices[good] = Math.max(0.01, Math.min(100, this.prices[good]));
     }
 
-    // Professional mobility responds to expected sales income.
-    const expectedIncome = (job: Job, agent: Agent) => {
-      const good = jobGood[job];
-      return baseProductionPerDay[job] * agent.productivity * this.prices[good] * saleRatio[good];
-    };
-
+    // Mobility: an individual may move when another activity would pay
+    // materially more given their own productivity and current prices.
+    const saleFractions = saleFraction;
     const switchThreshold = 0.05;
     const dailyMobility = Math.min(1, this.parameters.mobility);
 
     for (const agent of this.agents) {
-      const currentIncome = expectedIncome(agent.job, agent);
+      const expectedIncome = (job: Job) => {
+        const good = jobGood[job];
+        return (
+          baseProductionPerDay[job] *
+          agent.productivity *
+          this.prices[good] *
+          saleFractions[good]
+        );
+      };
+
+      const currentIncome = expectedIncome(agent.job);
       let bestJob = agent.job;
       let bestIncome = currentIncome;
 
       for (const job of jobs) {
-        const income = expectedIncome(job, agent);
+        const income = expectedIncome(job);
         if (income > bestIncome * (1 + switchThreshold)) {
           bestIncome = income;
           bestJob = job;
@@ -452,20 +483,13 @@ export class World {
       }
     }
 
-    // The only legal money movements are purchases. Correct floating-point
-    // residue so the monetary stock remains exactly conserved.
+    // Numerical cleanup only: the money supply is a conserved quantity.
     const currentSupply = this.agents.reduce((sum, agent) => sum + agent.money, 0);
     const residue = this.moneySupplyTarget - currentSupply;
+
     if (this.agents.length > 0 && Math.abs(residue) > 1e-9) {
       this.agents[this.agents.length - 1].money += residue;
     }
-  }
-
-  private initialJobFor(id: number): Job {
-    const fraction = (id + 0.5) / Math.max(1, this.parameters.population);
-    if (fraction < initialJobRatios.farmer) return "farmer";
-    if (fraction < initialJobRatios.farmer + initialJobRatios.forester) return "forester";
-    return "fisher";
   }
 
   private gaussian() {
