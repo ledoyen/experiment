@@ -46,6 +46,22 @@ const bins = (v: number[], n = 8) => {
   return result;
 };
 
+const binSums = (v: number[], n = 8) => {
+  const result = Array(n).fill(0);
+  if (!v.length) return result;
+  const min = Math.min(...v);
+  const max = Math.max(...v);
+  if (min === max) {
+    result[0] = v.reduce((sum, value) => sum + value, 0);
+    return result;
+  }
+  const width = (max - min) / n;
+  for (const x of v) {
+    result[Math.min(n - 1, Math.floor((x - min) / width))] += x;
+  }
+  return result;
+};
+
 export class World {
   readonly width = 1800;
   readonly height = 1100;
@@ -125,6 +141,7 @@ export class World {
     const productivity = this.agents.map(a => a.productivity);
     const wealthMin = Math.min(...wealth);
     const wealthMax = Math.max(...wealth);
+    const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
     const productivityMin = Math.min(...productivity);
     const productivityMax = Math.max(...productivity);
 
@@ -135,6 +152,8 @@ export class World {
       gini: gini(wealth),
       foodPrice: this.foodPrice,
       wealthBins: bins(wealth),
+      wealthBinSums: binSums(wealth),
+      wealthTotal,
       wealthMin,
       wealthMax,
       productivityBins: bins(productivity),
