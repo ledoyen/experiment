@@ -81,7 +81,7 @@ export class AppUi {
         <div class="drawer-body">
           <header>${t("parameters")}</header>
           ${this.range("population", "population", 50, 1000, this.world.parameters.population, 10)}
-          ${this.range("initialMoney", "initialMoney", 0, 500, this.world.parameters.initialMoney, 10)}
+          ${this.range("initialMoney", "initialMoneyPerIndividual", 0, 500, this.world.parameters.initialMoney, 10)}
           ${this.range("mobility", "mobility", 0, 1, this.world.parameters.mobility, .05)}
           ${this.range("priceSensitivity", "priceSensitivity", 0, 1, this.world.parameters.priceSensitivity, .05)}
           ${this.range("productivityVariance", "productivityVariance", 0, .5, this.world.parameters.productivityVariance, .01)}
@@ -445,6 +445,10 @@ function renderHistogram(
   const step = maxValue === min ? 0 : (maxValue - min) / values.length;
   const low = min + step * index;
   const high = index === values.length - 1 ? maxValue : low + step;
+  const wealthSum = histogram === "wealthBins" ? metric.wealthBinSums[index] : 0;
+  const wealthShare = histogram === "wealthBins" && metric.wealthTotal > 0
+    ? (wealthSum / metric.wealthTotal) * 100
+    : 0;
 
   if (tooltip) {
     const cursorPx = hoverX * w;
@@ -454,8 +458,10 @@ function renderHistogram(
     tooltip.innerHTML = `
       <div class="tooltip-time">${t(histogram === "wealthBins" ? "wealthDistribution" : "productivityDistribution")}</div>
       <div class="tooltip-row"><span>${t("range")}</span><strong>${formatValue(low)} – ${formatValue(high)}</strong></div>
-      <div class="tooltip-row"><span>${t("individuals")}</span><strong>${count}</strong></div>
-      <div class="tooltip-row"><span>${t("share")}</span><strong>${((count / Math.max(1, metric.population)) * 100).toFixed(1)} %</strong></div>
+      <div class="tooltip-row"><span>${t("individuals")}</span><strong>${count} (${((count / Math.max(1, metric.population)) * 100).toFixed(1)} %)</strong></div>
+      ${histogram === "wealthBins"
+        ? '<div class="tooltip-row"><span>' + t("fortuneSum") + '</span><strong>' + formatValue(wealthSum) + ' (' + wealthShare.toFixed(1) + ' %)</strong></div>'
+        : '<div class="tooltip-row"><span>' + t("share") + '</span><strong>' + ((count / Math.max(1, metric.population)) * 100).toFixed(1) + ' %</strong></div>'}
     `;
   }
 }
