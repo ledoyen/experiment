@@ -32,5 +32,6 @@
   "productivity": "Productivité",
   "position": "Position",
   "initialMoneyPerIndividual": "Monnaie initiale / individu",
-  "fortuneSum": "Somme des fortunes"
+  "fortuneSum": "Somme des fortunes",
+  "moneySupply": "Masse monétaire"
 }
