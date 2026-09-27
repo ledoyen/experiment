@@ -492,6 +492,14 @@ export class World {
     }
   }
 
+  private initialJobFor(id: number): Job {
+    const fraction = (id + 0.5) / Math.max(1, this.parameters.population);
+
+    if (fraction < initialJobRatios.farmer) return "farmer";
+    if (fraction < initialJobRatios.farmer + initialJobRatios.forester) return "forester";
+    return "fisher";
+  }
+
   private gaussian() {
     const u = Math.random() || 1e-9;
     const v = Math.random() || 1e-9;
