@@ -21,7 +21,6 @@
   "min": "min",
   "max": "max",
   "median": "med",
-  "count": "Count",
   "job.farmer": "Farming",
   "job.forester": "Forestry",
   "job.fisher": "Fishing",
@@ -31,5 +30,7 @@
   "share": "Population share",
   "job": "Job",
   "productivity": "Productivity",
-  "position": "Position"
+  "position": "Position",
+  "initialMoneyPerIndividual": "Initial money / individual",
+  "fortuneSum": "Total wealth"
 }
