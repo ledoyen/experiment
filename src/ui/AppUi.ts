@@ -302,8 +302,6 @@ export class AppUi {
     }
 
     tooltip.hidden = false;
-    const width = 220;
-    tooltip.style.left = `${Math.min(window.innerWidth - width - 12, screenX + 14)}px`;
     const width = 300;
     tooltip.style.left = `${Math.min(window.innerWidth - width - 12, Math.max(8, screenX + 14))}px`;
     tooltip.style.top = `${Math.min(window.innerHeight - 12, Math.max(12, screenY + 14))}px`;
