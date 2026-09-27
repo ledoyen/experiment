@@ -1,4 +1,4 @@
-export type Job = "farmer" | "forester" | "fisher" | "builder";
+export type Job = "farmer" | "forester" | "fisher";
 
 export interface Parameters {
   population: number;
