@@ -30,6 +30,11 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
   return Number(point[key as BaseSeriesKey]);
 }
 
+function seriesLabel(key: SeriesKey): string {
+  if (key.startsWith("price:")) return t("price") + " — " + t("good." + key.slice(6));
+  return t(key);
+}
+
 const formatValue = (value: number) => {
   if (Math.abs(value) >= 1000) return value.toFixed(0);
   if (Math.abs(value) >= 100) return value.toFixed(1);
@@ -313,7 +318,7 @@ export class AppUi {
       return `
         <div class="legend-item">
           <span class="legend-line" style="--series-color:${SERIES_COLORS[key]}"></span>
-          <span class="legend-name">${t(key)}</span>
+          <span class="legend-name">${seriesLabel(key)}</span>
           <span class="legend-stats">${t("min")} ${formatValue(min)} · ${t("max")} ${formatValue(max)} · ${t("median")} ${formatValue(med)}</span>
         </div>`;
     }).join("");
@@ -428,7 +433,7 @@ function renderLineChart(
         const left = cursorPx + tooltipWidth + 12 > w ? cursorPx - tooltipWidth - 12 : cursorPx + 10;
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${Math.max(4, Math.min(h - 28, py - 14))}px`;
-        tooltip.innerHTML = `<span>${t(key)}</span><strong>${formatValue(value)}</strong>`;
+        tooltip.innerHTML = `<span>${seriesLabel(key)}</span><strong>${formatValue(value)}</strong>`;
         tooltips.appendChild(tooltip);
       }
     }
