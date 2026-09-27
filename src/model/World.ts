@@ -1,87 +1,48 @@
+import { ACTIVITIES, ACTIVE_REFERENCE_ETP, DAILY_NEED, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 
-const jobs: Job[] = ["farmer", "forester", "fisher"];
+const activityJobs = ACTIVITIES.map(activity => activity.job);
 
-const jobGood: Record<Job, Good> = {
-  farmer: "food",
-  forester: "wood",
-  fisher: "fish"
+const jobColors: Record<Job, string> = {
+  agriculture_ble: "#7f9f5b", agriculture_pomme_de_terre: "#91a86b", agriculture_legumineuses: "#6e8f4e",
+  horticulture_legumes: "#88a96b", arboriculture_fruits: "#4f7f47", oliviculture: "#667f3b",
+  "élevage_lait": "#c49a6c", aviculture_oeufs: "#d1b66f", pêche: "#5d91b8", chasse: "#8d6e63",
+  textile: "#9b72a6", construction: "#b27a4e", bois_chauffage: "#5f4a3c", outillage: "#707070", idle: "#9aa39b"
 };
 
-const jobColor: Record<Job, string> = {
-  farmer: "#8ba86c",
-  forester: "#4e7650",
-  fisher: "#5d91b8"
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (!sorted.length) return 0;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-const dailyNeed: Record<Good, number> = {
-  food: 1,
-  wood: 0.3,
-  fish: 0.1
-};
-
-// The initial job distribution is aligned with the current XLS reference
-// at the level of broad activities: most work is food, followed by forestry,
-// with fishing as a smaller but non-zero activity.
-const initialJobRatios: Record<Job, number> = {
-  farmer: 0.84,
-  forester: 0.10,
-  fisher: 0.06
-};
-
-// Chosen so that the initial population roughly covers the reference basket.
-// Productivity then creates individual differences around these baselines.
-const baseProductionPerDay: Record<Job, number> = {
-  farmer: dailyNeed.food / initialJobRatios.farmer,
-  forester: dailyNeed.wood / initialJobRatios.forester,
-  fisher: dailyNeed.fish / initialJobRatios.fisher
-};
-
-const median = (v: number[]) => {
-  const a = [...v].sort((x, y) => x - y);
-  if (!a.length) return 0;
-  const i = Math.floor(a.length / 2);
-  return a.length % 2 ? a[i] : (a[i - 1] + a[i]) / 2;
-};
-
-const gini = (v: number[]) => {
-  const a = [...v].sort((x, y) => x - y);
-  const sum = a.reduce((x, y) => x + y, 0);
-  if (!a.length || sum <= 0) return 0;
+const gini = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const sum = sorted.reduce((a, b) => a + b, 0);
+  if (!sorted.length || sum <= 0) return 0;
   let weighted = 0;
-  for (let i = 0; i < a.length; i++) weighted += (i + 1) * a[i];
-  return (2 * weighted) / (a.length * sum) - (a.length + 1) / a.length;
+  for (let i = 0; i < sorted.length; i++) weighted += (i + 1) * sorted[i];
+  return (2 * weighted) / (sorted.length * sum) - (sorted.length + 1) / sorted.length;
 };
 
-const bins = (v: number[], n = 8) => {
-  const result = Array(n).fill(0);
-  if (!v.length) return result;
-  const min = Math.min(...v);
-  const max = Math.max(...v);
-  if (min === max) {
-    result[0] = v.length;
-    return result;
-  }
-  const width = (max - min) / n;
-  for (const x of v) {
-    result[Math.min(n - 1, Math.floor((x - min) / width))]++;
-  }
+const bins = (values: number[], count = 8) => {
+  const result = Array(count).fill(0);
+  if (!values.length) return result;
+  const min = Math.min(...values), max = Math.max(...values);
+  if (min === max) { result[0] = values.length; return result; }
+  const width = (max - min) / count;
+  for (const value of values) result[Math.min(count - 1, Math.floor((value - min) / width))]++;
   return result;
 };
 
-const binSums = (v: number[], n = 8) => {
-  const result = Array(n).fill(0);
-  if (!v.length) return result;
-  const min = Math.min(...v);
-  const max = Math.max(...v);
-  if (min === max) {
-    result[0] = v.reduce((sum, value) => sum + value, 0);
-    return result;
-  }
-  const width = (max - min) / n;
-  for (const x of v) {
-    result[Math.min(n - 1, Math.floor((x - min) / width))] += x;
-  }
+const binSums = (values: number[], count = 8) => {
+  const result = Array(count).fill(0);
+  if (!values.length) return result;
+  const min = Math.min(...values), max = Math.max(...values);
+  if (min === max) { result[0] = values.reduce((sum, value) => sum + value, 0); return result; }
+  const width = (max - min) / count;
+  for (const value of values) result[Math.min(count - 1, Math.floor((value - min) / width))] += value;
   return result;
 };
 
@@ -89,14 +50,13 @@ export class World {
   readonly width = 1800;
   readonly height = 1100;
   minute = 0;
-  foodPrice = 1;
-  readonly prices: Record<Good, number> = { food: 1, wood: 1, fish: 1 };
+  prices: Record<Good, number> = { ...INITIAL_PRICE };
   agents: Agent[] = [];
   parameters: Parameters;
 
+  private readonly history: Metrics[] = [];
+  private readonly snapshots: Array<{ minute: number; prices: Record<Good, number>; agents: Agent[] }> = [];
   private moneySupplyTarget = 0;
-  private history: Metrics[] = [];
-  private snapshots: { minute: number; foodPrice: number; agents: Agent[] }[] = [];
 
   constructor(parameters: Parameters) {
     this.parameters = structuredClone(parameters);
@@ -105,23 +65,44 @@ export class World {
 
   reset() {
     this.minute = 0;
-    this.foodPrice = 1;
-    this.prices.food = 1;
-    this.prices.wood = 1;
-    this.prices.fish = 1;
+    this.prices = { ...INITIAL_PRICE };
     this.moneySupplyTarget = this.parameters.population * this.parameters.initialMoney;
-    this.history = [];
-    this.snapshots = [];
+    this.history.length = 0;
+    this.snapshots.length = 0;
+
+    const referenceCounts = new Map<Job, number>();
+    let assigned = 0;
+
+    for (const activity of ACTIVITIES) {
+      if (activity.dormant || activity.referenceEtp <= 0) continue;
+      const count = Math.floor(this.parameters.population * activity.referenceEtp / Math.max(ACTIVE_REFERENCE_ETP, 1));
+      referenceCounts.set(activity.job, count);
+      assigned += count;
+    }
+
+    let remaining = Math.max(0, this.parameters.population - assigned);
+    const candidates = ACTIVITIES.filter(activity => !activity.dormant && activity.referenceEtp > 0);
+    for (let i = 0; i < remaining && candidates.length > 0; i++) {
+      const activity = candidates[i % candidates.length];
+      referenceCounts.set(activity.job, (referenceCounts.get(activity.job) ?? 0) + 1);
+    }
+
     this.agents = Array.from({ length: this.parameters.population }, (_, id) => {
+      let job: Job = "idle";
+      let cursor = 0;
+      for (const activity of ACTIVITIES) {
+        const count = referenceCounts.get(activity.job) ?? 0;
+        if (id >= cursor && id < cursor + count) { job = activity.job; break; }
+        cursor += count;
+      }
       const angle = Math.random() * Math.PI * 2;
       const radius = 120 + Math.random() * 430;
-
       return {
         id,
         x: this.width / 2 + Math.cos(angle) * radius,
         y: this.height / 2 + Math.sin(angle) * radius,
-        job: this.initialJobFor(id),
-        productivity: Math.exp(this.gaussian() * this.parameters.productivityVariance),
+        job,
+        productivity: this.randomProductivity(),
         money: this.parameters.initialMoney
       };
     });
@@ -138,371 +119,211 @@ export class World {
     const interval = Math.max(10, Math.floor(captureInterval));
 
     while (remaining > 0) {
-      const nextCapture = Math.max(
-        this.minute + 1,
-        Math.floor(this.minute / interval) * interval + interval
-      );
-
+      const nextCapture = Math.max(this.minute + 1, Math.floor(this.minute / interval) * interval + interval);
       const chunk = Math.min(remaining, nextCapture - this.minute);
       this.advanceChunk(chunk);
       remaining -= chunk;
-
-      if (this.minute === nextCapture) {
-        this.capture();
-      }
+      if (this.minute === nextCapture) this.capture();
     }
   }
 
   rewind(minutes = 60) {
     const target = Math.max(0, this.minute - minutes);
-    const snap = [...this.snapshots].reverse().find(s => s.minute <= target);
-
-    if (!snap) return;
-
-    this.minute = snap.minute;
-    this.foodPrice = snap.foodPrice;
-    this.agents = structuredClone(snap.agents);
-    this.history = this.history.filter(x => x.minute <= this.minute);
+    const snapshot = [...this.snapshots].reverse().find(item => item.minute <= target);
+    if (!snapshot) return;
+    this.minute = snapshot.minute;
+    this.prices = { ...snapshot.prices };
+    this.agents = structuredClone(snapshot.agents);
+    while (this.history.length && this.history[this.history.length - 1].minute > this.minute) this.history.pop();
   }
 
   getMetrics(): Metrics {
-    const wealth = this.agents.map(a => a.money);
-    const productivity = this.agents.map(a => a.productivity);
-    const wealthMin = Math.min(...wealth);
-    const wealthMax = Math.max(...wealth);
+    const wealth = this.agents.map(agent => agent.money);
+    const productivity = this.agents.map(agent => agent.productivity);
     const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
-    const productivityMin = Math.min(...productivity);
-    const productivityMax = Math.max(...productivity);
-
     return {
       minute: this.minute,
       population: this.agents.length,
       medianWealth: median(wealth),
       gini: gini(wealth),
-      foodPrice: this.prices.food,
-      moneySupply: wealth.reduce((sum, value) => sum + value, 0),
+      foodPrice: this.prices.ble,
+      moneySupply: wealthTotal,
       prices: { ...this.prices },
       wealthBins: bins(wealth),
       wealthBinSums: binSums(wealth),
       wealthTotal,
-      wealthMin,
-      wealthMax,
+      wealthMin: Math.min(...wealth),
+      wealthMax: Math.max(...wealth),
       productivityBins: bins(productivity),
-      productivityMin,
-      productivityMax
+      productivityMin: Math.min(...productivity),
+      productivityMax: Math.max(...productivity)
     };
   }
 
-  getHistory() {
-    return [...this.history];
-  }
+  getHistory() { return [...this.history]; }
 
   getDisplayHistory(speed: number) {
-    const interval =
-      speed >= 1000 ? 1440 :
-      speed >= 100 ? 120 :
-      speed >= 10 ? 30 :
-      10;
-
+    const interval = speed >= 1000 ? 1440 : speed >= 100 ? 120 : speed >= 10 ? 30 : 10;
     const result: Metrics[] = [];
-
-    for (const point of this.history) {
-      if (point.minute % interval === 0) result.push(point);
-    }
-
+    for (const point of this.history) if (point.minute % interval === 0) result.push(point);
     const last = this.history[this.history.length - 1];
     if (last && result[result.length - 1] !== last) result.push(last);
-
     return result;
   }
 
   getJobCounts(): Record<Job, number> {
-    const counts: Record<Job, number> = {
-      farmer: 0,
-      forester: 0,
-      fisher: 0
-    };
-
+    const counts = {} as Record<Job, number>;
+    for (const activity of ACTIVITIES) counts[activity.job] = 0;
+    counts.idle = 0;
     for (const agent of this.agents) counts[agent.job]++;
     return counts;
   }
 
-  color(job: Job) {
-    return jobColor[job];
-  }
+  color(job: Job) { return jobColors[job]; }
 
   getAgentAtWorldPosition(x: number, y: number, radius: number): Agent | null {
     const radiusSquared = radius * radius;
     let nearest: Agent | null = null;
     let nearestDistance = radiusSquared;
-
     for (const agent of this.agents) {
       const dx = agent.x - x;
       const dy = agent.y - y;
       const distance = dx * dx + dy * dy;
-
-      if (distance <= nearestDistance) {
-        nearestDistance = distance;
-        nearest = agent;
-      }
+      if (distance <= nearestDistance) { nearestDistance = distance; nearest = agent; }
     }
-
     return nearest;
   }
 
   private capture() {
     this.history.push(this.getMetrics());
     this.compactHistory();
-
-    this.snapshots.push({
-      minute: this.minute,
-      foodPrice: this.foodPrice,
-      agents: structuredClone(this.agents)
-    });
-
+    this.snapshots.push({ minute: this.minute, prices: { ...this.prices }, agents: structuredClone(this.agents) });
     this.compactSnapshots();
   }
 
   private compactHistory() {
     const now = this.minute;
     const buckets = new Map<string, Metrics>();
-
     for (const metric of this.history) {
       const age = now - metric.minute;
-      let key: string;
-
-      if (age < 60) {
-        key = `m10:${metric.minute}`;
-      } else if (age < 1440) {
-        key = `h:${Math.floor(metric.minute / 60)}`;
-      } else if (age < 43200) {
-        key = `d:${Math.floor(metric.minute / 1440)}`;
-      } else {
-        key = `mo:${Math.floor(metric.minute / 43200)}`;
-      }
-
+      const key = age < 60 ? "m10:" + metric.minute : age < 1440 ? "h:" + Math.floor(metric.minute / 60) : age < 43200 ? "d:" + Math.floor(metric.minute / 1440) : "mo:" + Math.floor(metric.minute / 43200);
       const existing = buckets.get(key);
-      if (!existing || metric.minute > existing.minute) {
-        buckets.set(key, metric);
-      }
+      if (!existing || metric.minute > existing.minute) buckets.set(key, metric);
     }
-
-    this.history = [...buckets.values()].sort((a, b) => a.minute - b.minute);
+    this.history.splice(0, this.history.length, ...[...buckets.values()].sort((a, b) => a.minute - b.minute));
   }
 
   private compactSnapshots() {
     const now = this.minute;
     const buckets = new Map<string, (typeof this.snapshots)[number]>();
-
     for (const snapshot of this.snapshots) {
       const age = now - snapshot.minute;
-      let key: string;
-
-      if (age < 60) {
-        key = `m10:${snapshot.minute}`;
-      } else if (age < 1440) {
-        key = `h:${Math.floor(snapshot.minute / 60)}`;
-      } else if (age < 43200) {
-        key = `d:${Math.floor(snapshot.minute / 1440)}`;
-      } else {
-        key = `mo:${Math.floor(snapshot.minute / 43200)}`;
-      }
-
+      const key = age < 60 ? "m10:" + snapshot.minute : age < 1440 ? "h:" + Math.floor(snapshot.minute / 60) : age < 43200 ? "d:" + Math.floor(snapshot.minute / 1440) : "mo:" + Math.floor(snapshot.minute / 43200);
       const existing = buckets.get(key);
-      if (!existing || snapshot.minute > existing.minute) {
-        buckets.set(key, snapshot);
-      }
+      if (!existing || snapshot.minute > existing.minute) buckets.set(key, snapshot);
     }
-
-    this.snapshots = [...buckets.values()].sort((a, b) => a.minute - b.minute);
+    this.snapshots.splice(0, this.snapshots.length, ...[...buckets.values()].sort((a, b) => a.minute - b.minute));
   }
 
   private advanceChunk(minutes: number) {
     const previousMinute = this.minute;
     this.minute += minutes;
-
     if (this.parameters.moneyEnabled) {
       const previousDay = Math.floor(previousMinute / 1440);
       const currentDay = Math.floor(this.minute / 1440);
-      const daysElapsed = currentDay - previousDay;
-
-      for (let day = 0; day < daysElapsed; day++) {
-        this.processMarketDay();
-      }
+      for (let day = previousDay; day < currentDay; day++) this.processMarketDay();
     }
-
     const distance = Math.sqrt(minutes) * 0.9;
-
     for (const agent of this.agents) {
-      agent.x = Math.max(
-        20,
-        Math.min(this.width - 20, agent.x + (Math.random() - 0.5) * distance)
-      );
-      agent.y = Math.max(
-        20,
-        Math.min(this.height - 20, agent.y + (Math.random() - 0.5) * distance)
-      );
+      agent.x = Math.max(20, Math.min(this.width - 20, agent.x + (Math.random() - 0.5) * distance));
+      agent.y = Math.max(20, Math.min(this.height - 20, agent.y + (Math.random() - 0.5) * distance));
     }
   }
 
   private processMarketDay() {
-    const supplies: Record<Good, number> = {
-      food: 0,
-      wood: 0,
-      fish: 0
-    };
+    const supplies = {} as Record<Good, number>;
+    for (const good of Object.keys(this.prices) as Good[]) supplies[good] = 0;
 
     for (const agent of this.agents) {
-      const good = jobGood[agent.job];
-      supplies[good] += baseProductionPerDay[agent.job] * agent.productivity;
+      const activity = activityByJob(agent.job);
+      if (!activity || activity.dormant) continue;
+      supplies[activity.output] += dailyOutputPerEtp(activity) * agent.productivity;
     }
 
-    const requiredDemand: Record<Good, number> = {
-      food: dailyNeed.food * this.agents.length,
-      wood: dailyNeed.wood * this.agents.length,
-      fish: dailyNeed.fish * this.agents.length
-    };
+    const basketCost = Object.keys(DAILY_NEED).reduce((sum, key) => {
+      const good = key as Good;
+      return sum + DAILY_NEED[good] * this.prices[good];
+    }, 0);
+    const affordability = this.agents.map(agent => Math.min(1, agent.money / Math.max(basketCost, 1e-9)));
+    const totalAffordability = affordability.reduce((sum, value) => sum + value, 0);
 
-    const requiredCost =
-      dailyNeed.food * this.prices.food +
-      dailyNeed.wood * this.prices.wood +
-      dailyNeed.fish * this.prices.fish;
+    const demand = {} as Record<Good, number>;
+    const saleFraction = {} as Record<Good, number>;
+    for (const good of Object.keys(this.prices) as Good[]) {
+      demand[good] = DAILY_NEED[good] * totalAffordability;
+      saleFraction[good] = demand[good] > 0 ? Math.min(1, supplies[good] / demand[good]) : 0;
+    }
 
-    // Every individual tries to buy the same essential basket.
-    // Their available money limits effective demand, but purchases remain
-    // transfers between agents: no new money enters the system.
-    const affordability = this.agents.map(agent =>
-      Math.min(1, agent.money / Math.max(1e-9, requiredCost))
-    );
-
-    const affordabilitySum = affordability.reduce((sum, value) => sum + value, 0);
-    const effectiveDemand: Record<Good, number> = {
-      food: dailyNeed.food * affordabilitySum,
-      wood: dailyNeed.wood * affordabilitySum,
-      fish: dailyNeed.fish * affordabilitySum
-    };
-
-    const purchaseFraction: Record<Good, number> = {
-      food: Math.min(
-        1,
-        effectiveDemand.food > 0 ? supplies.food / effectiveDemand.food : 0
-      ),
-      wood: Math.min(
-        1,
-        effectiveDemand.wood > 0 ? supplies.wood / effectiveDemand.wood : 0
-      ),
-      fish: Math.min(
-        1,
-        effectiveDemand.fish > 0 ? supplies.fish / effectiveDemand.fish : 0
-      )
-    };
-
-    const saleFraction: Record<Good, number> = {
-      food: Math.min(
-        1,
-        supplies.food > 0 ? effectiveDemand.food * purchaseFraction.food / supplies.food : 0
-      ),
-      wood: Math.min(
-        1,
-        supplies.wood > 0 ? effectiveDemand.wood * purchaseFraction.wood / supplies.wood : 0
-      ),
-      fish: Math.min(
-        1,
-        supplies.fish > 0 ? effectiveDemand.fish * purchaseFraction.fish / supplies.fish : 0
-      )
-    };
-
-    // Buyers spend only what they can afford and receive the same fraction
-    // of each essential good when the market is physically constrained.
     for (let index = 0; index < this.agents.length; index++) {
       const agent = this.agents[index];
-      const ratioByBudget = affordability[index];
-
-      const purchaseRatio = {
-        food: ratioByBudget * purchaseFraction.food,
-        wood: ratioByBudget * purchaseFraction.wood,
-        fish: ratioByBudget * purchaseFraction.fish
-      };
-
-      const spend =
-        dailyNeed.food * this.prices.food * purchaseRatio.food +
-        dailyNeed.wood * this.prices.wood * purchaseRatio.wood +
-        dailyNeed.fish * this.prices.fish * purchaseRatio.fish;
-
+      const affordabilityRatio = affordability[index];
+      let spend = 0;
+      for (const good of Object.keys(this.prices) as Good[]) {
+        if (DAILY_NEED[good] <= 0) continue;
+        spend += DAILY_NEED[good] * this.prices[good] * affordabilityRatio * saleFraction[good];
+      }
       agent.money = Math.max(0, agent.money - spend);
     }
 
-    // Sellers receive exactly the money spent on the goods they produced.
-    for (const agent of this.agents) {
-      const good = jobGood[agent.job];
-      const production = baseProductionPerDay[agent.job] * agent.productivity;
-      agent.money += production * this.prices[good] * saleFraction[good];
+    for (const good of Object.keys(this.prices) as Good[]) {
+      const soldQuantity = demand[good] * saleFraction[good];
+      if (soldQuantity <= 0 || supplies[good] <= 0) continue;
+      const revenue = soldQuantity * this.prices[good];
+      for (const agent of this.agents) {
+        const activity = activityByJob(agent.job);
+        if (!activity || activity.output !== good) continue;
+        const output = dailyOutputPerEtp(activity) * agent.productivity;
+        agent.money += revenue * (output / supplies[good]);
+      }
     }
 
-    // Prices react to effective demand vs available supply.
-    for (const good of ["food", "wood", "fish"] as Good[]) {
-      const demandSupplyRatio =
-        effectiveDemand[good] / Math.max(supplies[good], 1e-9);
-      const bounded = Math.max(-0.25, Math.min(0.25, demandSupplyRatio - 1));
-
+    for (const good of Object.keys(this.prices) as Good[]) {
+      const required = DAILY_NEED[good] * this.agents.length;
+      if (required <= 0 && supplies[good] <= 0) continue;
+      const ratio = required / Math.max(supplies[good], 1e-9);
+      const bounded = Math.max(-0.20, Math.min(0.20, ratio - 1));
       this.prices[good] *= Math.exp(this.parameters.priceSensitivity * bounded);
-      this.prices[good] = Math.max(0.01, Math.min(100, this.prices[good]));
+      this.prices[good] = Math.max(0.001, Math.min(100000, this.prices[good]));
     }
 
-    // Mobility: an individual may move when another activity would pay
-    // materially more given their own productivity and current prices.
-    const saleFractions = saleFraction;
-    const switchThreshold = 0.05;
-    const dailyMobility = Math.min(1, this.parameters.mobility);
+    const expectedIncome = (agent: Agent, job: Job) => {
+      const activity = activityByJob(job);
+      if (!activity || activity.dormant) return 0;
+      const output = dailyOutputPerEtp(activity) * agent.productivity;
+      return output * this.prices[activity.output] * saleFraction[activity.output];
+    };
 
     for (const agent of this.agents) {
-      const expectedIncome = (job: Job) => {
-        const good = jobGood[job];
-        return (
-          baseProductionPerDay[job] *
-          agent.productivity *
-          this.prices[good] *
-          saleFractions[good]
-        );
-      };
-
-      const currentIncome = expectedIncome(agent.job);
+      const current = expectedIncome(agent, agent.job);
       let bestJob = agent.job;
-      let bestIncome = currentIncome;
-
-      for (const job of jobs) {
-        const income = expectedIncome(job);
-        if (income > bestIncome * (1 + switchThreshold)) {
-          bestIncome = income;
-          bestJob = job;
-        }
+      let best = current;
+      for (const job of activityJobs) {
+        const income = expectedIncome(agent, job);
+        if (income > best * 1.05) { best = income; bestJob = job; }
       }
-
-      if (bestJob !== agent.job && Math.random() < dailyMobility) {
-        agent.job = bestJob;
-      }
+      if (bestJob !== agent.job && Math.random() < Math.min(1, this.parameters.mobility)) agent.job = bestJob;
     }
 
-    // Numerical cleanup only: the money supply is a conserved quantity.
     const currentSupply = this.agents.reduce((sum, agent) => sum + agent.money, 0);
     const residue = this.moneySupplyTarget - currentSupply;
-
-    if (this.agents.length > 0 && Math.abs(residue) > 1e-9) {
-      this.agents[this.agents.length - 1].money += residue;
-    }
+    if (this.agents.length > 0 && Math.abs(residue) > 1e-9) this.agents[this.agents.length - 1].money += residue;
   }
 
-  private initialJobFor(id: number): Job {
-    const fraction = (id + 0.5) / Math.max(1, this.parameters.population);
-
-    if (fraction < initialJobRatios.farmer) return "farmer";
-    if (fraction < initialJobRatios.farmer + initialJobRatios.forester) return "forester";
-    return "fisher";
-  }
-
-  private gaussian() {
+  private randomProductivity() {
+    const sigma = this.parameters.productivityVariance;
     const u = Math.random() || 1e-9;
     const v = Math.random() || 1e-9;
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    const normal = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    return Math.exp(normal * sigma - 0.5 * sigma * sigma);
   }
 }
