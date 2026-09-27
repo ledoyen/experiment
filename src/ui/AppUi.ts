@@ -3,13 +3,14 @@ import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 
-type SeriesKey = "medianWealth" | "gini" | "foodPrice";
+type SeriesKey = "medianWealth" | "gini" | "foodPrice" | "moneySupply";
 type HistogramKey = "wealthBins" | "productivityBins";
 
 const SERIES_COLORS: Record<SeriesKey, string> = {
   medianWealth: "#9fe870",
   gini: "#f4b942",
-  foodPrice: "#72b7ff"
+  foodPrice: "#72b7ff",
+  moneySupply: "#d1d5db"
 };
 
 const formatValue = (value: number) => {
@@ -65,6 +66,7 @@ export class AppUi {
           ${this.check("medianWealth", "medianWealth")}
           ${this.check("gini", "gini")}
           ${this.check("foodPrice", "foodPrice")}
+          ${this.check("moneySupply", "moneySupply")}
         </div>
 
         <div class="choices">
@@ -345,7 +347,8 @@ function renderLineChart(
   const palette: Record<SeriesKey, string> = {
     medianWealth: "#9fe870",
     gini: "#f4b942",
-    foodPrice: "#72b7ff"
+    foodPrice: "#72b7ff",
+    moneySupply: "#d1d5db"
   };
 
   const values = history.flatMap(point => keys.map(key => Number(point[key])));
