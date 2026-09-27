@@ -13,11 +13,20 @@ const ui = new AppUi(root, world, view);
 ui.mount();
 
 let last = performance.now();
+
 function frame(now: number) {
   const seconds = Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (ui.shouldRun()) world.step(Math.max(1, Math.floor(seconds * 60 * ui.currentSpeed())));
+
+  if (ui.shouldRun()) {
+    world.step(
+      Math.max(1, Math.floor(seconds * 60 * ui.currentSpeed())),
+      ui.currentRecordingInterval()
+    );
+  }
+
   ui.render();
   requestAnimationFrame(frame);
 }
+
 requestAnimationFrame(frame);
