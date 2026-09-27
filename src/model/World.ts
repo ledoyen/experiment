@@ -1,19 +1,17 @@
 import type { Agent, Job, Metrics, Parameters } from "../data/types";
 
-const jobs: Job[] = ["farmer", "forester", "fisher", "builder"];
+const jobs: Job[] = ["farmer", "forester", "fisher"];
 
 const jobFactor: Record<Job, number> = {
   farmer: 1.25,
   forester: 0.95,
-  fisher: 0.85,
-  builder: 0.65
+  fisher: 0.85
 };
 
 const jobColor: Record<Job, string> = {
   farmer: "#8ba86c",
   forester: "#4e7650",
-  fisher: "#5d91b8",
-  builder: "#b27a4e"
+  fisher: "#5d91b8"
 };
 
 const median = (v: number[]) => {
@@ -70,17 +68,19 @@ export class World {
     this.history = [];
     this.snapshots = [];
     this.agents = Array.from({ length: this.parameters.population }, (_, id) => {
-      const a = Math.random() * Math.PI * 2;
-      const r = 120 + Math.random() * 430;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 120 + Math.random() * 430;
+
       return {
         id,
-        x: this.width / 2 + Math.cos(a) * r,
-        y: this.height / 2 + Math.sin(a) * r,
+        x: this.width / 2 + Math.cos(angle) * radius,
+        y: this.height / 2 + Math.sin(angle) * radius,
         job: jobs[id % jobs.length],
         productivity: Math.exp(this.gaussian() * this.parameters.productivityVariance),
         money: this.parameters.initialMoney
       };
     });
+
     this.capture();
   }
 
@@ -88,14 +88,17 @@ export class World {
     this.parameters = { ...this.parameters, ...patch };
   }
 
-  step(minutes = 1) {
+  step(minutes = 1, captureInterval = 10) {
     let remaining = Math.max(0, Math.floor(minutes));
+    const interval = Math.max(10, Math.floor(captureInterval));
 
     while (remaining > 0) {
-      const nextCapture = this.nextCaptureMinute();
-      const untilCapture = Math.max(1, nextCapture - this.minute);
-      const chunk = Math.min(remaining, untilCapture);
+      const nextCapture = Math.max(
+        this.minute + 1,
+        Math.floor(this.minute / interval) * interval + interval
+      );
 
+      const chunk = Math.min(remaining, nextCapture - this.minute);
       this.advanceChunk(chunk);
       remaining -= chunk;
 
@@ -108,6 +111,7 @@ export class World {
   rewind(minutes = 60) {
     const target = Math.max(0, this.minute - minutes);
     const snap = [...this.snapshots].reverse().find(s => s.minute <= target);
+
     if (!snap) return;
 
     this.minute = snap.minute;
@@ -139,11 +143,11 @@ export class World {
     };
   }
 
-  getHistory(): Metrics[] {
+  getHistory() {
     return [...this.history];
   }
 
-  getDisplayHistory(speed: number): Metrics[] {
+  getDisplayHistory(speed: number) {
     const interval =
       speed >= 1000 ? 1440 :
       speed >= 100 ? 120 :
@@ -151,16 +155,13 @@ export class World {
       10;
 
     const result: Metrics[] = [];
+
     for (const point of this.history) {
-      if (point.minute % interval === 0) {
-        result.push(point);
-      }
+      if (point.minute % interval === 0) result.push(point);
     }
 
     const last = this.history[this.history.length - 1];
-    if (last && result[result.length - 1] !== last) {
-      result.push(last);
-    }
+    if (last && result[result.length - 1] !== last) result.push(last);
 
     return result;
   }
@@ -169,8 +170,7 @@ export class World {
     const counts: Record<Job, number> = {
       farmer: 0,
       forester: 0,
-      fisher: 0,
-      builder: 0
+      fisher: 0
     };
 
     for (const agent of this.agents) counts[agent.job]++;
@@ -179,6 +179,25 @@ export class World {
 
   color(job: Job) {
     return jobColor[job];
+  }
+
+  getAgentAtWorldPosition(x: number, y: number, radius: number): Agent | null {
+    const radiusSquared = radius * radius;
+    let nearest: Agent | null = null;
+    let nearestDistance = radiusSquared;
+
+    for (const agent of this.agents) {
+      const dx = agent.x - x;
+      const dy = agent.y - y;
+      const distance = dx * dx + dy * dy;
+
+      if (distance <= nearestDistance) {
+        nearestDistance = distance;
+        nearest = agent;
+      }
+    }
+
+    return nearest;
   }
 
   private capture() {
@@ -191,7 +210,7 @@ export class World {
       agents: structuredClone(this.agents)
     });
 
-    if (this.snapshots.length > 180) this.snapshots.shift();
+    this.compactSnapshots();
   }
 
   private compactHistory() {
@@ -203,16 +222,12 @@ export class World {
       let key: string;
 
       if (age < 60) {
-        // Current hour: 10-minute resolution.
         key = `m10:${metric.minute}`;
       } else if (age < 1440) {
-        // Earlier hours of the current day: one point per hour.
         key = `h:${Math.floor(metric.minute / 60)}`;
       } else if (age < 43200) {
-        // Earlier days of the current 30-day simulation month.
         key = `d:${Math.floor(metric.minute / 1440)}`;
       } else {
-        // Older history: one representative point per 30-day month, forever.
         key = `mo:${Math.floor(metric.minute / 43200)}`;
       }
 
@@ -225,9 +240,31 @@ export class World {
     this.history = [...buckets.values()].sort((a, b) => a.minute - b.minute);
   }
 
-  private nextCaptureMinute(): number {
-    const next = Math.floor(this.minute / 10) * 10 + 10;
-    return Math.max(this.minute + 1, next);
+  private compactSnapshots() {
+    const now = this.minute;
+    const buckets = new Map<string, (typeof this.snapshots)[number]>();
+
+    for (const snapshot of this.snapshots) {
+      const age = now - snapshot.minute;
+      let key: string;
+
+      if (age < 60) {
+        key = `m10:${snapshot.minute}`;
+      } else if (age < 1440) {
+        key = `h:${Math.floor(snapshot.minute / 60)}`;
+      } else if (age < 43200) {
+        key = `d:${Math.floor(snapshot.minute / 1440)}`;
+      } else {
+        key = `mo:${Math.floor(snapshot.minute / 43200)}`;
+      }
+
+      const existing = buckets.get(key);
+      if (!existing || snapshot.minute > existing.minute) {
+        buckets.set(key, snapshot);
+      }
+    }
+
+    this.snapshots = [...buckets.values()].sort((a, b) => a.minute - b.minute);
   }
 
   private advanceChunk(minutes: number) {
@@ -237,11 +274,11 @@ export class World {
       this.stepMarket(minutes);
     }
 
-    // Movement is cosmetic: aggregate it instead of simulating every minute.
     const distance = Math.sqrt(minutes) * 0.9;
-    for (const a of this.agents) {
-      a.x = Math.max(20, Math.min(this.width - 20, a.x + (Math.random() - 0.5) * distance));
-      a.y = Math.max(20, Math.min(this.height - 20, a.y + (Math.random() - 0.5) * distance));
+
+    for (const agent of this.agents) {
+      agent.x = Math.max(20, Math.min(this.width - 20, agent.x + (Math.random() - 0.5) * distance));
+      agent.y = Math.max(20, Math.min(this.height - 20, agent.y + (Math.random() - 0.5) * distance));
     }
   }
 
@@ -252,11 +289,11 @@ export class World {
 
     const switchProbability = 1 - Math.pow(1 - this.parameters.mobility / 1440, minutes);
 
-    for (const a of this.agents) {
-      a.money += jobFactor[a.job] * a.productivity * this.foodPrice / 60 * minutes;
+    for (const agent of this.agents) {
+      agent.money += jobFactor[agent.job] * agent.productivity * this.foodPrice / 60 * minutes;
 
       if (Math.random() < switchProbability) {
-        a.job = jobs[Math.floor(Math.random() * jobs.length)];
+        agent.job = jobs[Math.floor(Math.random() * jobs.length)];
       }
     }
   }
