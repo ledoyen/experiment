@@ -1,5 +1,4 @@
 import type { Agent } from "../data/types";
-import type { Agent } from "../data/types";
 import { World } from "../model/World";
 
 export class GameView {
@@ -11,7 +10,6 @@ export class GameView {
   private dragging = false;
   private origin = { x: 0, y: 0, camX: 0, camY: 0 };
   private agentHoverHandler: ((agent: Agent | null, screenX: number, screenY: number) => void) | null = null;
-  private agentHoverHandler: ((agent: Agent | null, screenX: number, screenY: number) => void) | null = null;
 
   constructor(root: HTMLElement, private readonly world: World) {
     this.canvas = document.createElement("canvas");
@@ -19,10 +17,6 @@ export class GameView {
     root.appendChild(this.canvas);
     this.ctx = this.canvas.getContext("2d")!;
     this.bind();
-  }
-
-  setAgentHoverHandler(handler: (agent: Agent | null, screenX: number, screenY: number) => void) {
-    this.agentHoverHandler = handler;
   }
 
   setAgentHoverHandler(handler: (agent: Agent | null, screenX: number, screenY: number) => void) {
