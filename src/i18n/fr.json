@@ -25,5 +25,11 @@
   "job.farmer": "Agriculture",
   "job.forester": "Sylviculture",
   "job.fisher": "Pêche",
-  "job.builder": "Construction"
+  "job.builder": "Construction",
+  "range": "Tranche",
+  "individuals": "Individus",
+  "share": "Part de la population",
+  "job": "Métier",
+  "productivity": "Productivité",
+  "position": "Position"
 }
