@@ -1,3 +1,4 @@
+import type { Agent } from "../data/types";
 import { World } from "../model/World";
 
 export class GameView {
@@ -8,6 +9,7 @@ export class GameView {
   private zoom = .8;
   private dragging = false;
   private origin = { x: 0, y: 0, camX: 0, camY: 0 };
+  private agentHoverHandler: ((agent: Agent | null, screenX: number, screenY: number) => void) | null = null;
 
   constructor(root: HTMLElement, private readonly world: World) {
     this.canvas = document.createElement("canvas");
@@ -15,6 +17,10 @@ export class GameView {
     root.appendChild(this.canvas);
     this.ctx = this.canvas.getContext("2d")!;
     this.bind();
+  }
+
+  setAgentHoverHandler(handler: (agent: Agent | null, screenX: number, screenY: number) => void) {
+    this.agentHoverHandler = handler;
   }
 
   render() {
@@ -34,12 +40,14 @@ export class GameView {
     this.ctx.translate(-this.camX, -this.camY);
 
     this.drawTerrain();
-    for (const a of this.world.agents) {
-      this.ctx.fillStyle = this.world.color(a.job);
+
+    for (const agent of this.world.agents) {
+      this.ctx.fillStyle = this.world.color(agent.job);
       this.ctx.beginPath();
-      this.ctx.arc(a.x, a.y, 3.5 / this.zoom, 0, Math.PI * 2);
+      this.ctx.arc(agent.x, agent.y, 3.5 / this.zoom, 0, Math.PI * 2);
       this.ctx.fill();
     }
+
     this.ctx.restore();
   }
 
@@ -72,39 +80,69 @@ export class GameView {
     c.fillStyle = "#9b9759";
     c.fillRect(1040, 180, 520, 310);
     c.strokeStyle = "rgba(80,70,35,.35)";
+
     for (let x = 1050; x < 1560; x += 28) {
-      c.beginPath(); c.moveTo(x, 180); c.lineTo(x, 490); c.stroke();
+      c.beginPath();
+      c.moveTo(x, 180);
+      c.lineTo(x, 490);
+      c.stroke();
     }
 
     for (let i = 0; i < 36; i++) {
       const x = 960 + (i % 9) * 72;
       const y = 570 + Math.floor(i / 9) * 72;
+
       c.fillStyle = "#d0bc94";
       c.fillRect(x, y, 40, 28);
       c.fillStyle = "#8e6345";
-      c.beginPath(); c.moveTo(x - 4, y); c.lineTo(x + 20, y - 20); c.lineTo(x + 44, y); c.closePath(); c.fill();
+      c.beginPath();
+      c.moveTo(x - 4, y);
+      c.lineTo(x + 20, y - 20);
+      c.lineTo(x + 44, y);
+      c.closePath();
+      c.fill();
     }
   }
 
   private bind() {
     window.addEventListener("resize", () => this.render());
-    this.canvas.addEventListener("pointerdown", e => {
+
+    this.canvas.addEventListener("pointerdown", event => {
       this.dragging = true;
-      this.origin = { x: e.clientX, y: e.clientY, camX: this.camX, camY: this.camY };
-      this.canvas.setPointerCapture(e.pointerId);
+      this.origin = {
+        x: event.clientX,
+        y: event.clientY,
+        camX: this.camX,
+        camY: this.camY
+      };
+      this.canvas.setPointerCapture(event.pointerId);
     });
-    this.canvas.addEventListener("pointermove", e => {
-      if (!this.dragging) return;
-      this.camX = this.origin.camX - (e.clientX - this.origin.x) / this.zoom;
-      this.camY = this.origin.camY - (e.clientY - this.origin.y) / this.zoom;
+
+    this.canvas.addEventListener("pointermove", event => {
+      if (this.dragging) {
+        this.camX = this.origin.camX - (event.clientX - this.origin.x) / this.zoom;
+        this.camY = this.origin.camY - (event.clientY - this.origin.y) / this.zoom;
+      }
+
+      const rect = this.canvas.getBoundingClientRect();
+      const worldX = this.camX + (event.clientX - rect.left - rect.width / 2) / this.zoom;
+      const worldY = this.camY + (event.clientY - rect.top - rect.height / 2) / this.zoom;
+      const agent = this.world.getAgentAtWorldPosition(worldX, worldY, 12 / this.zoom);
+      this.agentHoverHandler?.(agent, event.clientX, event.clientY);
     });
-    this.canvas.addEventListener("pointerup", e => {
+
+    this.canvas.addEventListener("pointerleave", event => {
+      this.agentHoverHandler?.(null, event.clientX, event.clientY);
+    });
+
+    this.canvas.addEventListener("pointerup", event => {
       this.dragging = false;
-      this.canvas.releasePointerCapture(e.pointerId);
+      this.canvas.releasePointerCapture(event.pointerId);
     });
-    this.canvas.addEventListener("wheel", e => {
-      e.preventDefault();
-      this.zoom = Math.max(.35, Math.min(2.7, this.zoom * (e.deltaY < 0 ? 1.08 : .92)));
+
+    this.canvas.addEventListener("wheel", event => {
+      event.preventDefault();
+      this.zoom = Math.max(.35, Math.min(2.7, this.zoom * (event.deltaY < 0 ? 1.08 : .92)));
     }, { passive: false });
   }
 }
