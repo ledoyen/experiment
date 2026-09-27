@@ -201,6 +201,15 @@ export class AppUi {
     return this.speed;
   }
 
+  currentRecordingInterval() {
+    switch (this.speed) {
+      case 1000: return 1440;
+      case 100: return 120;
+      case 10: return 30;
+      default: return 10;
+    }
+  }
+
   render() {
     const fullHistory = this.world.getHistory();
     const displayHistory = this.world.getDisplayHistory(this.speed);
