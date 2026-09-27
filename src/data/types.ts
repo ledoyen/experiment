@@ -1,3 +1,6 @@
+export type Sex = "male" | "female";
+export type PhysiologyState = "normal" | "pregnancy" | "lactation";
+
 export type Good =
   | "ble" | "pomme_de_terre" | "legumineuses" | "legumes" | "fruits" | "huile_olive"
   | "lait" | "oeufs" | "volaille" | "porc" | "poisson" | "gibier" | "vetement"
@@ -14,8 +17,11 @@ export interface Parameters {
   priceSensitivity: number; productivityVariance: number;
 }
 
+import type { NutritionReserves } from "./nutrition";
+
 export interface Agent {
   id: number; x: number; y: number; job: Job; productivity: number; money: number;
+  sex: Sex; physiologyState: PhysiologyState; nutrition: NutritionReserves;
 }
 
 export interface Metrics {
