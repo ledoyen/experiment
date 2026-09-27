@@ -204,7 +204,7 @@ export class AppUi {
   render() {
     const fullHistory = this.world.getHistory();
     const displayHistory = this.world.getDisplayHistory(this.speed);
-    const latest = fullHistory[fullHistory.length - 1];
+    const latest = this.world.getMetrics();
 
     const line = this.ui.querySelector<HTMLCanvasElement>("#line");
     const hist = this.ui.querySelector<HTMLCanvasElement>("#hist");
