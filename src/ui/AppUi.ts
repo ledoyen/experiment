@@ -30,7 +30,7 @@ export class AppUi {
   private readonly ui: HTMLDivElement;
   private running = true;
   private speed = 1;
-  private series = new Set<SeriesKey>(["medianWealth", "gini", "foodPrice"]);
+  private series = new Set<SeriesKey>(["medianWealth", "gini", "foodPrice", "moneySupply"]);
   private histogram: HistogramKey = "wealthBins";
   private hoverX: number | null = null;
   private histogramHoverX: number | null = null;
