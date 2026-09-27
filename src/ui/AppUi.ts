@@ -407,7 +407,7 @@ function renderLineChart(
 
     history.forEach((point, index) => {
       const px = 5 + index / (history.length - 1) * (w - 10);
-      const py = h - 6 - (Number(point[key]) - min) / span * (h - 12);
+      const py = h - 6 - (seriesValue(point, key) - min) / span * (h - 12);
       index === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     });
 
