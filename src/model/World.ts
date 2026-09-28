@@ -8,7 +8,9 @@ import {
   heatingPurchaseNeed,
   priceMultiplier,
   seasonalProductionMultiplier,
-  shouldSwitchJob
+  shouldSwitchJob,
+  exponentialDistributionBins,
+  linearDistributionBins
 } from "../data/glossary";
 
 const activityJobs = ACTIVITIES.map(activity => activity.job);
@@ -21,39 +23,19 @@ const jobColors: Record<Job, string> = {
 };
 
 const median = (values: number[]) => {
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (!sorted.length) return 0;
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
 const gini = (values: number[]) => {
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = values.filter(Number.isFinite).map(value => Math.max(0, value)).sort((a, b) => a - b);
   const sum = sorted.reduce((a, b) => a + b, 0);
   if (!sorted.length || sum <= 0) return 0;
   let weighted = 0;
   for (let i = 0; i < sorted.length; i++) weighted += (i + 1) * sorted[i];
   return (2 * weighted) / (sorted.length * sum) - (sorted.length + 1) / sorted.length;
-};
-
-const bins = (values: number[], count = 8) => {
-  const result = Array(count).fill(0);
-  if (!values.length) return result;
-  const min = Math.min(...values), max = Math.max(...values);
-  if (min === max) { result[0] = values.length; return result; }
-  const width = (max - min) / count;
-  for (const value of values) result[Math.min(count - 1, Math.floor((value - min) / width))]++;
-  return result;
-};
-
-const binSums = (values: number[], count = 8) => {
-  const result = Array(count).fill(0);
-  if (!values.length) return result;
-  const min = Math.min(...values), max = Math.max(...values);
-  if (min === max) { result[0] = values.reduce((sum, value) => sum + value, 0); return result; }
-  const width = (max - min) / count;
-  for (const value of values) result[Math.min(count - 1, Math.floor((value - min) / width))] += value;
-  return result;
 };
 
 export class World {
@@ -155,25 +137,33 @@ export class World {
   }
 
   getMetrics(): Metrics {
-    const wealth = this.agents.map(agent => agent.money);
-    const productivity = this.agents.map(agent => agent.productivity);
+    const wealth = this.agents.map(agent => Number.isFinite(agent.money) ? Math.max(0, agent.money) : 0);
+    const productivity = this.agents.map(agent => Number.isFinite(agent.productivity) ? Math.max(0, agent.productivity) : 0);
+    const wealthDistribution = exponentialDistributionBins(wealth);
+    const productivityDistribution = linearDistributionBins(productivity);
     const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
+
     return {
       minute: this.minute,
       population: this.agents.length,
       medianWealth: median(wealth),
       gini: gini(wealth),
-      foodPrice: this.prices.ble,
-      moneySupply: wealthTotal + this.monetaryReserve,
+      foodPrice: Number.isFinite(this.prices.ble) ? this.prices.ble : 0,
+      moneySupply: Number.isFinite(wealthTotal + this.monetaryReserve)
+        ? wealthTotal + this.monetaryReserve
+        : 0,
       prices: { ...this.prices },
-      wealthBins: bins(wealth),
-      wealthBinSums: binSums(wealth),
+      wealthBins: wealthDistribution.counts,
+      wealthBinSums: wealthDistribution.sums,
+      wealthBinEdges: wealthDistribution.edges,
       wealthTotal,
-      wealthMin: Math.min(...wealth),
-      wealthMax: Math.max(...wealth),
-      productivityBins: bins(productivity),
-      productivityMin: Math.min(...productivity),
-      productivityMax: Math.max(...productivity)
+      wealthMin: wealth.length ? Math.min(...wealth) : 0,
+      wealthMax: wealth.length ? Math.max(...wealth) : 0,
+      productivityBins: productivityDistribution.counts,
+      productivityBinSums: productivityDistribution.sums,
+      productivityBinEdges: productivityDistribution.edges,
+      productivityMin: productivity.length ? Math.min(...productivity) : 0,
+      productivityMax: productivity.length ? Math.max(...productivity) : 0
     };
   }
 
