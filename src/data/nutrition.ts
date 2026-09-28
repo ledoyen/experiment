@@ -158,3 +158,11 @@ export function foodToNutrition(food: FoodNutrition, quantityKg: number): Partia
     selenium: food.selenium * unitsOf100g
   };
 }
+
+
+/** Lowest energy reserve compatible with life in the current simulation model. */
+export const MINIMUM_SURVIVABLE_ENERGY_RESERVE_KCAL = 0;
+
+export function isLethalNutritionState(reserves: NutritionReserves): boolean {
+  return reserves.energy.value <= MINIMUM_SURVIVABLE_ENERGY_RESERVE_KCAL;
+}
