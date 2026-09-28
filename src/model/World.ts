@@ -567,7 +567,8 @@ export class World {
         agent.sex,
         agent.physiologyState,
         Number.MAX_SAFE_INTEGER,
-        equalPrices
+        equalPrices,
+        perCapitaSupply
       )
     );
 
