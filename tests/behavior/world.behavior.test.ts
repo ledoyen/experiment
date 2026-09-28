@@ -25,15 +25,6 @@ describe("simulation behavioral invariants", () => {
     });
 
     const populations = runDays(world, 30);
-    const nutritionValues = world.agents.slice(0, 10).map(agent => ({
-      id: agent.id,
-      energy: agent.nutrition.energy.value,
-      max: agent.nutrition.energy.max,
-      fat: agent.nutrition.fat.value,
-      money: agent.money
-    }));
-    console.log("NO-MONEY-END", populations.at(-1), nutritionValues);
-
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(180);
   });
 
