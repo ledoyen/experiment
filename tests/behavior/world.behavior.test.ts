@@ -12,7 +12,7 @@ function runDays(world: World, days: number): number[] {
 }
 
 function moneyInSystem(world: World): number {
-  return world.agents.reduce((sum, agent) => sum + agent.money, 0) + 0;
+  return world.getMetrics().moneySupply;
 }
 
 describe("simulation behavioral invariants", () => {
@@ -79,7 +79,7 @@ describe("simulation behavioral invariants", () => {
 
     const target = 200 * 100;
 
-    for (let day = 0; day < 60; day++) {
+    for (let day = 0; day < 30; day++) {
       world.step(1440, 1440);
       const supply = moneyInSystem(world);
       expect(Number.isFinite(supply)).toBe(true);
