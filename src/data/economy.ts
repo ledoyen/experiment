@@ -78,3 +78,27 @@ export function dailyOutputPerEtp(activity: ActivityDefinition): number {
 export function activityByJob(job: Job): ActivityDefinition | undefined {
   return ACTIVITIES.find(activity => activity.job === job);
 }
+
+export const GOOD_PRICE_UNIT: Record<Good, string> = {
+  ble: "kg",
+  pomme_de_terre: "kg",
+  legumineuses: "kg",
+  legumes: "kg",
+  fruits: "kg",
+  huile_olive: "kg",
+  lait: "kg",
+  oeufs: "kg",
+  volaille: "kg",
+  porc: "kg",
+  poisson: "kg",
+  gibier: "kg",
+  vetement: "unité",
+  chauffage: "tonne",
+  outil: "unité",
+  logement: "m²"
+};
+
+export const FOOD_GOODS: Good[] = [
+  "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
+  "huile_olive", "lait", "oeufs", "volaille", "porc", "poisson", "gibier"
+];
