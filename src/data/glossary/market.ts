@@ -50,3 +50,40 @@ export function shouldSwitchJob(
   const alternative = Number.isFinite(alternativeIncome) ? Math.max(0, alternativeIncome) : 0;
   return alternative > current * (1 + JOB_SWITCH_PREMIUM);
 }
+
+
+/**
+ * Share of a marginal producer's output that can be sold at today's demand.
+ * When supply is zero but demand is positive, a new producer can sell all
+ * of a normal production day: scarcity is therefore an incentive to switch.
+ */
+export function marginalSaleFraction(
+  demand: number,
+  currentSupply: number,
+  marginalOutput: number
+): number {
+  const safeDemand = Number.isFinite(demand) ? Math.max(0, demand) : 0;
+  const safeSupply = Number.isFinite(currentSupply) ? Math.max(0, currentSupply) : 0;
+  const safeOutput = Number.isFinite(marginalOutput) ? Math.max(0, marginalOutput) : 0;
+
+  if (safeDemand <= 0 || safeOutput <= 0) return 0;
+  return Math.min(1, safeDemand / Math.max(safeSupply + safeOutput, 1e-9));
+}
+
+/**
+ * Expected revenue of one additional worker entering an activity.
+ * Uses unmet demand, not only the fraction sold by workers already in place.
+ */
+export function expectedMarginalIncome(
+  demand: number,
+  currentSupply: number,
+  marginalOutput: number,
+  price: number
+): number {
+  const safePrice = Number.isFinite(price) ? Math.max(0, price) : 0;
+  return marginalOutput * marginalSaleFraction(
+    demand,
+    currentSupply,
+    marginalOutput
+  ) * safePrice;
+}
