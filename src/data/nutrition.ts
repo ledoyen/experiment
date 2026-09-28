@@ -52,6 +52,7 @@ export interface FoodNutrition {
 }
 
 export const INITIAL_RESERVE_MIN_RATIO = 0.90;
+export const INDIVIDUAL_REQUIREMENT_VARIANCE = 0.10;
 
 export const NUTRITION: NutritionDefinition[] = [
   { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 2, target: { male: 2500, female: 2000 } },
@@ -101,11 +102,12 @@ export function targetFor(nutrient: NutritionDefinition, sex: Sex, state: Physio
 export function createNutritionReserves(
   sex: Sex,
   state: PhysiologyState,
-  initialRatio = 1
+  initialRatio = 1,
+  requirementFactor = 1
 ): NutritionReserves {
   return Object.fromEntries(
     NUTRITION.map(nutrient => {
-      const target = targetFor(nutrient, sex, state);
+      const target = targetFor(nutrient, sex, state) * requirementFactor;
       const max = target * nutrient.maxDays;
       return [nutrient.id, {
         value: max * Math.max(0, Math.min(1, initialRatio)),
@@ -122,7 +124,8 @@ export function applyNutritionDay(
   reserves: NutritionReserves,
   intake: Partial<Record<NutritionId, number>>,
   sex: Sex,
-  state: PhysiologyState
+  state: PhysiologyState,
+  requirementFactor = 1
 ): NutritionReserves {
   const next = { ...reserves };
   for (const nutrient of NUTRITION) {
