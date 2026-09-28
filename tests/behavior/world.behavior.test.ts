@@ -119,6 +119,30 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
+  it("moves workers toward a suddenly absent production", () => {
+    const world = new World({
+      ...defaultParameters(),
+      population: 200,
+      initialMoney: 100,
+      moneyEnabled: true,
+      mobility: 1,
+      priceSensitivity: 1
+    });
+
+    const targetJob = "agriculture_ble" as const;
+    for (const agent of world.agents) {
+      if (agent.job === targetJob) agent.job = "agriculture_pomme_de_terre";
+    }
+
+    const before = world.agents.filter(agent => agent.job === targetJob).length;
+    expect(before).toBe(0);
+
+    world.step(1440, 1440);
+
+    const after = world.agents.filter(agent => agent.job === targetJob).length;
+    expect(after).toBeGreaterThan(0);
+  });
+
   it("changes market prices no more than once per simulation day", () => {
     const world = new World({
       ...defaultParameters(),
