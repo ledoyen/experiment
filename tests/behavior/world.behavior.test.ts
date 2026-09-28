@@ -39,7 +39,7 @@ describe("simulation behavioral invariants", () => {
 
     const populations = runDays(world, 10);
 
-    expect(Math.min(...populations)).toBeGreaterThan(0);
+    expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
   });
 
   it("does not make every death happen on exactly the same day", () => {
