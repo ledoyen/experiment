@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
   allocateFoodBeforeComfort,
@@ -126,10 +126,14 @@ export class World {
         money: this.parameters.initialMoney,
         sex: id % 2 === 0 ? "male" : "female",
         physiologyState: "normal",
+        metabolicFactor:
+          1 +
+          (Math.random() * 2 - 1) * INDIVIDUAL_REQUIREMENT_VARIANCE,
         nutrition: createNutritionReserves(
           id % 2 === 0 ? "male" : "female",
           "normal",
-          INITIAL_RESERVE_MIN_RATIO + Math.random() * (1 - INITIAL_RESERVE_MIN_RATIO)
+          INITIAL_RESERVE_MIN_RATIO + Math.random() * (1 - INITIAL_RESERVE_MIN_RATIO),
+          metabolicFactor
         ),
         heatingStock: 1,
         inventory: {}
@@ -351,7 +355,9 @@ export class World {
         agent.sex,
         agent.physiologyState,
         agent.money,
-        prices
+        prices,
+        undefined,
+        agent.metabolicFactor
       )
     );
 
@@ -416,7 +422,8 @@ export class World {
         agent.nutrition,
         intake,
         agent.sex,
-        agent.physiologyState
+        agent.physiologyState,
+        agent.metabolicFactor
       );
     }
 
@@ -594,7 +601,8 @@ export class World {
         agent.physiologyState,
         Number.MAX_SAFE_INTEGER,
         equalPrices,
-        perCapitaSupply
+        perCapitaSupply,
+        agent.metabolicFactor
       )
     );
 
