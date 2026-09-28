@@ -403,7 +403,10 @@ export class World {
         const activity = activityByJob(agent.job);
         if (!activity || activity.output !== good) continue;
 
-        const output = dailyOutputPerEtp(activity) * agent.productivity;
+        const output =
+          dailyOutputPerEtp(activity) *
+          agent.productivity *
+          seasonalProductionMultiplier(activity.job, simulationDay);
         agent.money += revenue * (output / supplies[good]);
       }
     }
