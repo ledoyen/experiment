@@ -22,12 +22,6 @@ export const CONSUMED_GOODS: Good[] = [
   "huile_olive", "lait", "oeufs", "poisson", "vetement", "chauffage", "outil"
 ];
 
-export const DAILY_NEED: Record<Good, number> = {
-  ble: 0.300, pomme_de_terre: 0.300, legumineuses: 0.100, legumes: 0.400, fruits: 0.300,
-  huile_olive: 0.025, lait: 0.400, oeufs: 0.050, volaille: 0, porc: 0, poisson: 0.100, gibier: 0,
-  vetement: 1 / 365, chauffage: 0, outil: 0.30 / 365, logement: 0
-};
-
 const RAW_INITIAL_PRICE: Partial<Record<Good, number>> = {
   ble: 110.8360672146801, pomme_de_terre: 11.08360672146801, legumineuses: 110.8360672146801,
   legumes: 11.08360672146801, fruits: 22.16721344293602, huile_olive: 307.8779644852224,
@@ -35,11 +29,6 @@ const RAW_INITIAL_PRICE: Partial<Record<Good, number>> = {
   vetement: 3694.535573822669, chauffage: 3694.535573822669, outil: 738.9071147645338,
   logement: 5541.803360734004
 };
-
-const referenceBasketCost = CONSUMED_GOODS.reduce(
-  (sum, good) => sum + DAILY_NEED[good] * (RAW_INITIAL_PRICE[good] ?? 0),
-  0
-);
 
 export const NUTRITIONALLY_CALIBRATED_PRICE_SCALE = initialPriceScale(RAW_INITIAL_PRICE);
 
