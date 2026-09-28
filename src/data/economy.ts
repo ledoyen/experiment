@@ -1,4 +1,5 @@
 import type { Good, Job } from "./types";
+import { initialPriceScale } from "./glossary/nutritionCost";
 
 export interface ActivityDefinition {
   job: Exclude<Job, "idle">;
@@ -40,8 +41,13 @@ const referenceBasketCost = CONSUMED_GOODS.reduce(
   0
 );
 
+export const NUTRITIONALLY_CALIBRATED_PRICE_SCALE = initialPriceScale(RAW_INITIAL_PRICE);
+
 export const INITIAL_PRICE: Record<Good, number> = Object.fromEntries(
-  GOODS.map(good => [good, (RAW_INITIAL_PRICE[good] ?? 0) * 100 / referenceBasketCost])
+  GOODS.map(good => [
+    good,
+    (RAW_INITIAL_PRICE[good] ?? 0) * NUTRITIONALLY_CALIBRATED_PRICE_SCALE
+  ])
 ) as Record<Good, number>;
 
 const activityRows: Array<[Exclude<Job, "idle">, string, Good, number, number, string, boolean?]> = [
