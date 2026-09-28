@@ -10,7 +10,9 @@ import {
   seasonalProductionMultiplier,
   shouldSwitchJob,
   exponentialDistributionBins,
-  linearDistributionBins
+  linearDistributionBins,
+  planFoodDemand,
+  MAX_STORED_FOOD_DAYS_FOR_PRICE
 } from "../data/glossary";
 
 const activityJobs = ACTIVITIES.map(activity => activity.job);
@@ -101,7 +103,8 @@ export class World {
         sex: id % 2 === 0 ? "male" : "female",
         physiologyState: "normal",
         nutrition: createNutritionReserves(id % 2 === 0 ? "male" : "female", "normal"),
-        heatingStock: 1
+        heatingStock: 1,
+        inventory: {}
       };
     });
 
@@ -240,15 +243,22 @@ export class World {
   private advanceChunk(minutes: number) {
     const previousMinute = this.minute;
     this.minute += minutes;
+
     const previousDay = Math.floor(previousMinute / 1440);
     const currentDay = Math.floor(this.minute / 1440);
+
     for (let day = previousDay; day < currentDay; day++) {
       const simulationDay = day + 1;
       const heatingConsumption = heatingConsumptionForDay(simulationDay);
 
       for (const agent of this.agents) {
-        agent.heatingStock = Math.max(0, agent.heatingStock - heatingConsumption);
+        agent.heatingStock = Math.max(
+          0,
+          agent.heatingStock - heatingConsumption
+        );
       }
+
+      this.produceForDay(simulationDay);
 
       if (this.parameters.moneyEnabled) {
         this.processMarketDay(simulationDay);
@@ -256,138 +266,118 @@ export class World {
         this.processCollectiveNutritionDay();
       }
     }
+
     const distance = Math.sqrt(minutes) * 0.9;
     for (const agent of this.agents) {
-      agent.x = Math.max(20, Math.min(this.width - 20, agent.x + (Math.random() - 0.5) * distance));
-      agent.y = Math.max(20, Math.min(this.height - 20, agent.y + (Math.random() - 0.5) * distance));
+      agent.x = Math.max(
+        20,
+        Math.min(
+          this.width - 20,
+          agent.x + (Math.random() - 0.5) * distance
+        )
+      );
+      agent.y = Math.max(
+        20,
+        Math.min(
+          this.height - 20,
+          agent.y + (Math.random() - 0.5) * distance
+        )
+      );
     }
   }
 
-  private processMarketDay(simulationDay: number) {
-    const supplies = {} as Record<Good, number>;
-    const marketIntake = {} as Record<NutritionId, number>;
-
-    for (const good of Object.keys(this.prices) as Good[]) {
-      supplies[good] = 0;
-    }
-
+  private produceForDay(simulationDay: number) {
     for (const agent of this.agents) {
       const activity = activityByJob(agent.job);
       if (!activity || activity.dormant) continue;
-      supplies[activity.output] +=
+
+      const production =
         dailyOutputPerEtp(activity) *
         agent.productivity *
         seasonalProductionMultiplier(activity.job, simulationDay);
-    }
 
-    const foodBasketCost = FOOD_GOODS.reduce(
-      (sum, good) => sum + DAILY_NEED[good] * this.prices[good],
+      if (!Number.isFinite(production) || production <= 0) continue;
+
+      agent.inventory[activity.output] =
+        (agent.inventory[activity.output] ?? 0) + production;
+    }
+  }
+
+  private inventoryTotal(good: Good): number {
+    return this.agents.reduce(
+      (sum, agent) => sum + Math.max(0, agent.inventory[good] ?? 0),
       0
     );
+  }
 
-    const affordability = this.agents.map(agent =>
-      Math.min(1, agent.money / Math.max(foodBasketCost, 1e-9))
+  private processMarketDay(simulationDay: number) {
+    const prices = { ...this.prices };
+    const foodPlans = this.agents.map(agent =>
+      planFoodDemand(
+        agent.nutrition,
+        agent.sex,
+        agent.physiologyState,
+        agent.money,
+        prices
+      )
     );
 
-    const totalAffordability = affordability.reduce((sum, value) => sum + value, 0);
-
-    // Heating is a stock: each person consumes 1 tonne/year and replenishes
-    // only when the household stock falls below its target.
-    const desiredHeating = this.agents.map(agent =>
-      heatingPurchaseNeed(simulationDay, agent.heatingStock)
-    );
-
-    const demand = {} as Record<Good, number>;
+    const foodDemand = {} as Record<Good, number>;
     const saleFraction = {} as Record<Good, number>;
-    for (const good of Object.keys(this.prices) as Good[]) {
-      demand[good] = 0;
-      saleFraction[good] = 0;
-    }
 
     for (const good of FOOD_GOODS) {
-      demand[good] = DAILY_NEED[good] * totalAffordability;
+      const demand = foodPlans.reduce(
+        (sum, plan) => sum + (plan[good] ?? 0),
+        0
+      );
+      const supply = this.inventoryTotal(good);
+
+      foodDemand[good] = demand;
       saleFraction[good] =
-        demand[good] > 0
-          ? Math.min(1, supplies[good] / demand[good])
-          : 0;
+        demand > 0 ? Math.min(1, supply / demand) : 0;
     }
 
-    // Food is explicitly the first household expense. Heating can only use
-    // the money left after the food allocation.
-    const remainingMoneyAfterFood = this.agents.map((agent, index) => {
-      const desiredFoodSpend =
-        foodBasketCost * affordability[index] * (
-          FOOD_GOODS.length > 0 ? 1 : 0
-        );
-
-      const allocation = allocateFoodBeforeComfort(
-        agent.money,
-        desiredFoodSpend
-      );
-
-      agent.money -= allocation.foodSpending;
-      return allocation.remainderAfterFood;
+    const actualFoodPurchases = this.agents.map(plan => {
+      const actual = {} as Record<Good, number>;
+      for (const good of FOOD_GOODS) {
+        actual[good] = (plan[good] ?? 0) * saleFraction[good];
+      }
+      return actual;
     });
 
-    const foodFulfillment = FOOD_GOODS.every(
-      good => saleFraction[good] >= 1
-    ) ? 1 : 0;
-
-    const affordableHeatingDemand = comfortPurchaseAllowed(foodFulfillment)
-      ? desiredHeating.reduce(
-          (sum, quantity, index) =>
-            sum +
-            Math.min(
-              quantity,
-              remainingMoneyAfterFood[index] / Math.max(this.prices.chauffage, 1e-9)
-            ),
-          0
-        )
-      : 0;
-
-    demand.chauffage = affordableHeatingDemand;
-    saleFraction.chauffage =
-      affordableHeatingDemand > 0
-        ? Math.min(1, supplies.chauffage / affordableHeatingDemand)
-        : 0;
-
+    // Execute food purchases. The amount spent is never above the plan's budget.
     for (let index = 0; index < this.agents.length; index++) {
       const agent = this.agents[index];
-      const desiredPurchase = Math.min(
-        desiredHeating[index],
-        remainingMoneyAfterFood[index] / Math.max(this.prices.chauffage, 1e-9)
-      );
-      const heatingPurchase = desiredPurchase * saleFraction.chauffage;
+      const purchase = actualFoodPurchases[index];
 
-      agent.money -= heatingPurchase * this.prices.chauffage;
-      agent.heatingStock = Math.min(1, agent.heatingStock + heatingPurchase);
-    }
-
-    // Compute the nutrient intake of the sold food basket.
-    for (const nutrient of NUTRITION) {
-      marketIntake[nutrient.id] = 0;
-    }
-
-    for (const good of FOOD_GOODS) {
-      const quantity = DAILY_NEED[good] * saleFraction[good];
-      const food = FOOD_NUTRITION[good];
-      if (quantity <= 0 || !food) continue;
-
-      const contribution = foodToNutrition(food, quantity);
-      for (const nutrient of NUTRITION) {
-        marketIntake[nutrient.id] += contribution[nutrient.id] ?? 0;
+      let spend = 0;
+      for (const good of FOOD_GOODS) {
+        spend += purchase[good] * prices[good];
       }
+
+      agent.money = Math.max(0, agent.money - spend);
     }
 
+    // Convert actual food purchases into physiological intake.
     for (let index = 0; index < this.agents.length; index++) {
       const agent = this.agents[index];
-      const ratio = affordability[index];
-      const intake = Object.fromEntries(
-        NUTRITION.map(nutrient => [
-          nutrient.id,
-          marketIntake[nutrient.id] * ratio
-        ])
-      ) as Partial<Record<NutritionId, number>>;
+      const intake = {} as Partial<Record<NutritionId, number>>;
+
+      for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
+
+      for (const good of FOOD_GOODS) {
+        const quantity = actualFoodPurchases[index][good];
+        if (quantity <= 0) continue;
+
+        const food = FOOD_NUTRITION[good];
+        if (!food) continue;
+
+        const contribution = foodToNutrition(food, quantity);
+        for (const nutrient of NUTRITION) {
+          intake[nutrient.id] =
+            (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
+        }
+      }
 
       agent.nutrition = applyNutritionDay(
         agent.nutrition,
@@ -397,47 +387,111 @@ export class World {
       );
     }
 
-    this.removeDeadAgents();
+    // Heating is a lower priority than food.
+    const remainingMoney = this.agents.map(agent => agent.money);
+    const heatingDemand = this.agents.map((agent, index) => {
+      const desired = heatingPurchaseNeed(
+        simulationDay,
+        agent.heatingStock
+      );
+      if (desired <= 0) return 0;
 
-    // Redistribute exactly what buyers spent to producers.
+      return Math.min(
+        desired,
+        remainingMoney[index] / Math.max(this.prices.chauffage, 1e-9)
+      );
+    });
+
+    const totalHeatingDemand = heatingDemand.reduce(
+      (sum, value) => sum + value,
+      0
+    );
+    const heatingSupply = this.inventoryTotal("chauffage");
+    const heatingSaleFraction =
+      totalHeatingDemand > 0
+        ? Math.min(1, heatingSupply / totalHeatingDemand)
+        : 0;
+
+    for (let index = 0; index < this.agents.length; index++) {
+      const quantity = heatingDemand[index] * heatingSaleFraction;
+      this.agents[index].money -= quantity * this.prices.chauffage;
+      this.agents[index].heatingStock = Math.min(
+        1,
+        this.agents[index].heatingStock + quantity
+      );
+    }
+
+    // Money from each commodity sale goes to the people who owned the stock.
     for (const good of [...FOOD_GOODS, "chauffage" as Good]) {
-      const soldQuantity = demand[good] * saleFraction[good];
-      if (soldQuantity <= 0 || supplies[good] <= 0) continue;
+      const soldQuantity =
+        (good === "chauffage"
+          ? totalHeatingDemand * heatingSaleFraction
+          : foodDemand[good] * saleFraction[good]);
 
-      const revenue = soldQuantity * this.prices[good];
+      if (soldQuantity <= 0) continue;
 
-      for (const agent of this.agents) {
-        const activity = activityByJob(agent.job);
-        if (!activity || activity.output !== good) continue;
+      const totalStock = this.inventoryTotal(good);
+      if (totalStock <= 0) continue;
 
-        const output =
-          dailyOutputPerEtp(activity) *
-          agent.productivity *
-          seasonalProductionMultiplier(activity.job, simulationDay);
-        agent.money += revenue * (output / supplies[good]);
+      const revenue = soldQuantity * prices[good];
+
+      for (const seller of this.agents) {
+        const sellerStock = Math.max(0, seller.inventory[good] ?? 0);
+        if (sellerStock <= 0) continue;
+
+        const sold = soldQuantity * sellerStock / totalStock;
+        seller.inventory[good] = Math.max(0, sellerStock - sold);
+        seller.money += sold * prices[good];
       }
     }
 
-    // Price formation uses actual intended purchases relative to physical supply.
+    // A price changes at most once in this daily market clearing.
     for (const good of [...FOOD_GOODS, "chauffage" as Good]) {
-      const required = demand[good];
-      if (required <= 0 && supplies[good] <= 0) continue;
+      const demand =
+        good === "chauffage"
+          ? totalHeatingDemand
+          : foodDemand[good];
+
+      const productionLikeSupply =
+        demand > 0
+          ? Math.min(
+              this.inventoryTotal(good),
+              demand * MAX_STORED_FOOD_DAYS_FOR_PRICE
+            )
+          : 0;
+
+      const dailyReferenceSupply =
+        productionLikeSupply > 0
+          ? productionLikeSupply
+          : this.inventoryTotal(good);
+
+      if (demand <= 0 && dailyReferenceSupply <= 0) continue;
 
       this.prices[good] = priceMultiplier(
         this.prices[good],
-        required,
-        supplies[good],
+        demand,
+        dailyReferenceSupply,
         this.parameters.priceSensitivity
       );
     }
 
-    // Mobility follows expected market income.
+    // Professional mobility follows the income available from today's sales.
     const expectedIncome = (agent: Agent, job: Job) => {
       const activity = activityByJob(job);
       if (!activity || activity.dormant) return 0;
 
-      const output = dailyOutputPerEtp(activity) * agent.productivity;
-      return output * this.prices[activity.output] * saleFraction[activity.output];
+      const output =
+        dailyOutputPerEtp(activity) *
+        agent.productivity *
+        seasonalProductionMultiplier(activity.job, simulationDay);
+
+      const good = activity.output;
+      const sale =
+        good === "chauffage"
+          ? heatingSaleFraction
+          : saleFraction[good] ?? 0;
+
+      return output * this.prices[good] * sale;
     };
 
     for (const agent of this.agents) {
@@ -461,7 +515,8 @@ export class World {
       }
     }
 
-    // Floating-point correction only: monetary stock remains conserved.
+    this.removeDeadAgents();
+
     const currentSupply =
       this.agents.reduce((sum, agent) => sum + agent.money, 0) +
       this.monetaryReserve;
@@ -473,27 +528,83 @@ export class World {
   }
 
   private processCollectiveNutritionDay() {
-    const intake = {} as Record<NutritionId, number>;
-    for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
+    // Before money, allocation is still constrained by the same real stocks,
+    // but there is no price or monetary budget: people take food according to
+    // their current physiological needs.
+    const referencePrices = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, 1])
+    ) as Partial<Record<Good, number>>;
+
+    const plans = this.agents.map(agent =>
+      planFoodDemand(
+        agent.nutrition,
+        agent.sex,
+        agent.physiologyState,
+        Number.MAX_SAFE_INTEGER,
+        referencePrices
+      )
+    );
+
+    const fractions = {} as Record<Good, number>;
 
     for (const good of FOOD_GOODS) {
-      const quantity = DAILY_NEED[good];
-      const food = FOOD_NUTRITION[good];
-      if (quantity <= 0 || !food) continue;
-
-      const contribution = foodToNutrition(food, quantity);
-      for (const nutrient of NUTRITION) {
-        intake[nutrient.id] += contribution[nutrient.id] ?? 0;
-      }
+      const demand = plans.reduce(
+        (sum, plan) => sum + (plan[good] ?? 0),
+        0
+      );
+      const supply = this.inventoryTotal(good);
+      fractions[good] = demand > 0 ? Math.min(1, supply / demand) : 0;
     }
 
-    for (const agent of this.agents) {
+    for (let index = 0; index < this.agents.length; index++) {
+      const agent = this.agents[index];
+      const intake = {} as Partial<Record<NutritionId, number>>;
+
+      for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
+
+      for (const good of FOOD_GOODS) {
+        const quantity = (plans[index][good] ?? 0) * fractions[good];
+        const food = FOOD_NUTRITION[good];
+        if (quantity <= 0 || !food) continue;
+
+        const contribution = foodToNutrition(food, quantity);
+        for (const nutrient of NUTRITION) {
+          intake[nutrient.id] =
+            (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
+        }
+
+        // In a non-monetary world, remove the consumed quantity from the
+        // owners' stocks proportionally after the allocation below.
+      }
+
       agent.nutrition = applyNutritionDay(
         agent.nutrition,
         intake,
         agent.sex,
         agent.physiologyState
       );
+    }
+
+    // Remove consumed food from commodity stocks proportionally.
+    for (const good of FOOD_GOODS) {
+      const sold = plans.reduce(
+        (sum, plan) => sum + (plan[good] ?? 0),
+        0
+      ) * fractions[good];
+
+      if (sold <= 0) continue;
+
+      const totalStock = this.inventoryTotal(good);
+      if (totalStock <= 0) continue;
+
+      for (const seller of this.agents) {
+        const stock = Math.max(0, seller.inventory[good] ?? 0);
+        if (stock <= 0) continue;
+        seller.inventory[good] = Math.max(
+          0,
+          stock - sold * stock / totalStock
+        );
+      }
     }
 
     this.removeDeadAgents();
@@ -504,7 +615,7 @@ export class World {
 
     for (const agent of this.agents) {
       if (isLethalNutritionState(agent.nutrition)) {
-        this.monetaryReserve += agent.money;
+        this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
       }
