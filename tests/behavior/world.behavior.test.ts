@@ -118,7 +118,7 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
-  it("moves workers toward suddenly absent heating production", () => {
+  it("moves workers toward suddenly absent olive-oil production", () => {
     const world = new World({
       ...defaultParameters(),
       population: 200,
@@ -128,23 +128,31 @@ describe("simulation behavioral invariants", () => {
       priceSensitivity: 1
     });
 
+    for (const good of [
+      "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
+      "lait", "oeufs", "poisson"
+    ] as const) {
+      world.prices[good] = 100000;
+    }
+
     for (const agent of world.agents) {
-      agent.heatingStock = 0;
-      if (agent.job === "bois_chauffage") agent.job = "agriculture_pomme_de_terre";
+      if (agent.job === "oliviculture") {
+        agent.job = "agriculture_pomme_de_terre";
+      }
     }
 
     const before = world.agents.filter(
-      agent => agent.job === "bois_chauffage"
+      agent => agent.job === "oliviculture"
     ).length;
     expect(before).toBe(0);
 
     world.step(1440, 1440);
 
     const after = world.agents.filter(
-      agent => agent.job === "bois_chauffage"
+      agent => agent.job === "oliviculture"
     ).length;
 
-    expect(world.prices.chauffage).toBeGreaterThan(0);
+    expect(world.prices.huile_olive).toBeGreaterThan(0);
     expect(after).toBeGreaterThan(0);
   });
 
