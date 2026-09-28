@@ -7,7 +7,7 @@
 import { FOOD_NUTRITION, NUTRITION, foodToNutrition, targetFor, type NutritionReserves } from "../nutrition";
 import type { Good, PhysiologyState, Sex } from "../types";
 
-export const MAX_FOOD_PURCHASE_ROUNDS = 16;
+export const MAX_FOOD_PURCHASE_ROUNDS = 256;
 
 function dailyIntakeNeed(
   nutrientId: (typeof NUTRITION)[number],
