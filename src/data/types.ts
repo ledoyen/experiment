@@ -23,6 +23,7 @@ export interface Agent {
   id: number; x: number; y: number; job: Job; productivity: number; money: number;
   sex: Sex; physiologyState: PhysiologyState; nutrition: NutritionReserves;
   heatingStock: number;
+  inventory: Partial<Record<Good, number>>;
 }
 
 export interface Metrics {
