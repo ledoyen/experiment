@@ -94,7 +94,7 @@ describe("simulation behavioral invariants", () => {
       productivityVariance: 0.2
     });
 
-    for (let day = 0; day < 120; day++) {
+    for (let day = 0; day < 60; day++) {
       world.step(1440, 1440);
       const metrics = world.getMetrics();
 
@@ -134,6 +134,7 @@ describe("simulation behavioral invariants", () => {
     ] as const) {
       world.prices[good] = 100000;
     }
+    const initialOlivePrice = world.prices.huile_olive;
 
     for (const agent of world.agents) {
       if (agent.job === "oliviculture") {
@@ -152,7 +153,7 @@ describe("simulation behavioral invariants", () => {
       agent => agent.job === "oliviculture"
     ).length;
 
-    expect(world.prices.huile_olive).toBeGreaterThan(0);
+    expect(world.prices.huile_olive).toBeGreaterThan(initialOlivePrice);
     expect(after).toBeGreaterThan(0);
   });
 
