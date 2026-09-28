@@ -1,18 +1,20 @@
 import type { Parameters, Metrics, Agent, Good } from "../data/types";
 import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
 import { NUTRITION, type NutritionId } from "../data/nutrition";
+import { chartTimeResolution, simulationTimeParts } from "../data/glossary";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 
-type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply";
+type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population";
 type SeriesKey = BaseSeriesKey | `price:${Good}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
 const SERIES_COLORS: Record<string, string> = {
   medianWealth: "#9fe870",
   gini: "#f4b942",
-  moneySupply: "#d1d5db"
+  moneySupply: "#d1d5db",
+  population: "#ff9f68"
 };
 
 const PRICE_COLORS = ["#72b7ff", "#8dd3c7", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#bc80bd", "#ccebc5", "#ffed6f", "#a6cee3"];
@@ -67,7 +69,7 @@ export class AppUi {
   private readonly ui: HTMLDivElement;
   private running = true;
   private speed = 1;
-  private series = new Set<SeriesKey>(["medianWealth", "gini", "moneySupply", "price:ble"]);
+  private series = new Set<SeriesKey>(["medianWealth", "gini", "moneySupply", "population", "price:ble"]);
   private histogram: HistogramKey = "wealthBins";
   private hoverX: number | null = null;
   private histogramHoverX: number | null = null;
@@ -90,6 +92,7 @@ export class AppUi {
         <div class="line-wrap">
           <canvas id="line"></canvas>
           <div id="line-tooltips" class="line-tooltips" hidden></div>
+          <div id="line-time-tooltip" class="line-time-tooltip" hidden></div>
         </div>
 
         <div id="line-legend" class="line-legend"></div>
@@ -103,6 +106,7 @@ export class AppUi {
           ${this.check("medianWealth", "medianWealth")}
           ${this.check("gini", "gini")}
           ${this.check("moneySupply", "moneySupply")}
+          ${this.check("population", "livingPopulation")}
           ${this.check("price:ble", "good.ble")}
         </div>
         <details class="price-choices">
@@ -269,7 +273,8 @@ export class AppUi {
         displayHistory,
         this.series,
         this.hoverX,
-        this.ui.querySelector<HTMLDivElement>("#line-tooltips")
+        this.ui.querySelector<HTMLDivElement>("#line-tooltips"),
+        this.ui.querySelector<HTMLDivElement>("#line-time-tooltip")
       );
     }
 
@@ -409,15 +414,35 @@ function setup(canvas: HTMLCanvasElement) {
   return { ctx, w, h };
 }
 
+function formatChartTime(history: Metrics[], index: number): string {
+  const current = history[index]?.minute ?? 0;
+  const previous = index > 0 ? history[index - 1].minute : current;
+  const next = index + 1 < history.length ? history[index + 1].minute : current;
+  const deltas = [current - previous, next - current].filter(delta => delta > 0);
+  const resolution = chartTimeResolution(deltas.length ? Math.min(...deltas) : 0);
+  const parts = simulationTimeParts(current);
+
+  switch (resolution) {
+    case "month":
+      return `${t("month")} ${parts.month} · ${t("year")} ${parts.year}`;
+    case "day":
+      return `${t("day")} ${parts.day}`;
+    case "hour":
+    case "minute":
+    default:
+      return `${t("day")} ${parts.day} · ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+  }
+}
+
 function renderLineChart(
   canvas: HTMLCanvasElement,
   history: Metrics[],
   active: Set<SeriesKey>,
   hoverX: number | null,
-  tooltips: HTMLDivElement | null
+  tooltips: HTMLDivElement | null,
+  timeTooltip: HTMLDivElement | null
 ) {
   const { ctx, w, h } = setup(canvas);
-
   ctx.fillStyle = "#0d140f";
   ctx.fillRect(0, 0, w, h);
 
@@ -426,6 +451,9 @@ function renderLineChart(
   if (tooltips) {
     tooltips.innerHTML = "";
     tooltips.hidden = hoverX === null || history.length < 2 || keys.length === 0;
+  }
+  if (timeTooltip) {
+    timeTooltip.hidden = hoverX === null || history.length < 2 || keys.length === 0;
   }
 
   if (history.length < 2 || !keys.length) return;
@@ -438,12 +466,8 @@ function renderLineChart(
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1e-9, max - min);
-
   const hoverRatio = hoverX === null ? 0 : hoverX;
-  const hoverIndex = Math.min(
-    history.length - 1,
-    Math.max(0, Math.round(hoverRatio * (history.length - 1)))
-  );
+  const hoverIndex = Math.min(history.length - 1, Math.max(0, Math.round(hoverRatio * (history.length - 1))));
   const hoverPoint = history[hoverIndex];
   const cursorPx = 5 + hoverRatio * (w - 10);
 
@@ -454,25 +478,28 @@ function renderLineChart(
     ctx.moveTo(cursorPx, 4);
     ctx.lineTo(cursorPx, h - 4);
     ctx.stroke();
+
+    if (timeTooltip) {
+      timeTooltip.hidden = false;
+      timeTooltip.textContent = formatChartTime(history, hoverIndex);
+      timeTooltip.style.left = `${cursorPx}px`;
+    }
   }
 
   keys.forEach(key => {
     ctx.strokeStyle = palette[key];
     ctx.lineWidth = 2;
     ctx.beginPath();
-
     history.forEach((point, index) => {
       const px = 5 + index / (history.length - 1) * (w - 10);
       const py = h - 6 - (seriesValue(point, key) - min) / span * (h - 12);
       index === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     });
-
     ctx.stroke();
 
     if (hoverX !== null) {
       const value = seriesValue(hoverPoint, key);
       const py = h - 6 - (value - min) / span * (h - 12);
-
       ctx.fillStyle = palette[key];
       ctx.beginPath();
       ctx.arc(cursorPx, py, 6, 0, Math.PI * 2);
@@ -495,7 +522,6 @@ function renderLineChart(
     }
   });
 }
-
 function renderHistogram(
   canvas: HTMLCanvasElement,
   metric: Metrics,
