@@ -134,6 +134,7 @@ describe("simulation behavioral invariants", () => {
     ] as const) {
       world.prices[good] = 100000;
     }
+    world.prices.huile_olive = 1;
     const initialOlivePrice = world.prices.huile_olive;
 
     for (const agent of world.agents) {
