@@ -2,6 +2,7 @@ import { ACTIVITIES, ACTIVE_REFERENCE_ETP, DAILY_NEED, FOOD_GOODS, INITIAL_PRICE
 import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
+  allocateFoodBeforeComfort,
   heatingConsumptionForDay,
   heatingPurchaseNeed,
   priceMultiplier,
@@ -320,22 +321,21 @@ export class World {
           : 0;
     }
 
-    // Food purchases happen first. This determines how much money remains
-    // available for household heating stock.
+    // Food is explicitly the first household expense. Heating can only use
+    // the money left after the food allocation.
     const remainingMoneyAfterFood = this.agents.map((agent, index) => {
-      const ratio = affordability[index];
-      let spend = 0;
+      const desiredFoodSpend =
+        foodBasketCost * affordability[index] * (
+          FOOD_GOODS.length > 0 ? 1 : 0
+        );
 
-      for (const good of FOOD_GOODS) {
-        spend +=
-          DAILY_NEED[good] *
-          this.prices[good] *
-          ratio *
-          saleFraction[good];
-      }
+      const allocation = allocateFoodBeforeComfort(
+        agent.money,
+        desiredFoodSpend
+      );
 
-      agent.money = Math.max(0, agent.money - spend);
-      return agent.money;
+      agent.money -= allocation.foodSpending;
+      return allocation.remainderAfterFood;
     });
 
     const affordableHeatingDemand = desiredHeating.reduce(
