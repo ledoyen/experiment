@@ -318,19 +318,13 @@ export class World {
     ) as Partial<Record<Good, number>>;
     marketSupply.chauffage = this.inventoryTotal("chauffage");
 
-    const population = Math.max(1, this.agents.length);
-    const perCapitaSupply = Object.fromEntries(
-      FOOD_GOODS.map(good => [good, this.inventoryTotal(good) / population])
-    ) as Partial<Record<Good, number>>;
-
     const foodPlans = this.agents.map(agent =>
       planFoodDemand(
         agent.nutrition,
         agent.sex,
         agent.physiologyState,
         agent.money,
-        prices,
-        perCapitaSupply
+        prices
       )
     );
 
@@ -551,9 +545,8 @@ export class World {
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
-    const population = Math.max(1, this.agents.length);
-    const perCapitaSupply = Object.fromEntries(
-      FOOD_GOODS.map(good => [good, this.inventoryTotal(good) / population])
+    const equalPrices = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, 1])
     ) as Partial<Record<Good, number>>;
 
     const plans = this.agents.map(agent =>
@@ -562,8 +555,7 @@ export class World {
         agent.sex,
         agent.physiologyState,
         Number.MAX_SAFE_INTEGER,
-        this.prices,
-        perCapitaSupply
+        equalPrices
       )
     );
 
