@@ -13,9 +13,10 @@ function dailyIntakeNeed(
   nutrientId: (typeof NUTRITION)[number],
   reserve: NutritionReserves[(typeof NUTRITION)[number]["id"]],
   sex: Sex,
-  state: PhysiologyState
+  state: PhysiologyState,
+  requirementFactor: number
 ): number {
-  const target = targetFor(nutrientId, sex, state);
+  const target = targetFor(nutrientId, sex, state) * requirementFactor;
   // At least today's physiological requirement must be covered. When the
   // reserve is low, extra food is useful to rebuild the buffer.
   return Math.max(target, reserve.max - reserve.value);
@@ -27,7 +28,8 @@ export function planFoodDemand(
   state: PhysiologyState,
   availableMoney: number,
   prices: Partial<Record<Good, number>>,
-  allocationCaps?: Partial<Record<Good, number>>
+  allocationCaps?: Partial<Record<Good, number>>,
+  requirementFactor = 1
 ): Record<Good, number> {
   const demand = {} as Record<Good, number>;
   for (const good of Object.keys(FOOD_NUTRITION) as Good[]) demand[good] = 0;
@@ -36,7 +38,13 @@ export function planFoodDemand(
   const needs = Object.fromEntries(
     NUTRITION.map(nutrient => [
       nutrient.id,
-      dailyIntakeNeed(nutrient, reserves[nutrient.id], sex, state)
+      dailyIntakeNeed(
+        nutrient,
+        reserves[nutrient.id],
+        sex,
+        state,
+        requirementFactor
+      )
     ])
   ) as Record<(typeof NUTRITION)[number]["id"], number>;
 
