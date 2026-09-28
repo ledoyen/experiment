@@ -10,6 +10,7 @@ import {
   seasonalProductionMultiplier,
   shouldSwitchJob,
   expectedMarginalIncome,
+  jobSwitchProbability,
   exponentialDistributionBins,
   linearDistributionBins,
   planFoodDemand,
@@ -523,7 +524,11 @@ export class World {
 
       if (
         bestJob !== agent.job &&
-        Math.random() < Math.min(1, this.parameters.mobility)
+        Math.random() < jobSwitchProbability(
+          current,
+          best,
+          this.parameters.mobility
+        )
       ) {
         agent.job = bestJob;
       }
@@ -545,8 +550,15 @@ export class World {
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
+    const population = Math.max(1, this.agents.length);
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
+    ) as Partial<Record<Good, number>>;
+    const perCapitaSupply = Object.fromEntries(
+      FOOD_GOODS.map(good => [
+        good,
+        this.inventoryTotal(good) / population
+      ])
     ) as Partial<Record<Good, number>>;
 
     const plans = this.agents.map(agent =>
