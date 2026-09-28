@@ -434,6 +434,35 @@ function formatChartTime(history: Metrics[], index: number): string {
   }
 }
 
+function niceAxis(minValue: number, maxValue: number, ticks = 5) {
+  if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+    return { min: 0, max: 1, step: 0.2 };
+  }
+
+  if (minValue === maxValue) {
+    const max = maxValue <= 0 ? 1 : maxValue;
+    return { min: 0, max, step: max / (ticks - 1) };
+  }
+
+  const range = maxValue - minValue;
+  const exponent = Math.floor(Math.log10(Math.max(range, 1e-9)));
+  const base = Math.pow(10, exponent);
+  const normalized = range / base;
+  const niceStep =
+    normalized <= 1 ? 1 :
+    normalized <= 2 ? 2 :
+    normalized <= 5 ? 5 : 10;
+
+  const step = niceStep * base;
+  let min = Math.floor(minValue / step) * step;
+  let max = Math.ceil(maxValue / step) * step;
+
+  if (minValue >= 0) min = 0;
+  if (max <= min) max = min + step * (ticks - 1);
+
+  return { min, max, step };
+}
+
 function renderLineChart(
   canvas: HTMLCanvasElement,
   history: Metrics[],
@@ -458,25 +487,61 @@ function renderLineChart(
 
   if (history.length < 2 || !keys.length) return;
 
+  const left = 38;
+  const right = 6;
+  const top = 14;
+  const bottom = 10;
+  const plotWidth = Math.max(1, w - left - right);
+  const plotHeight = Math.max(1, h - top - bottom);
+
   const palette: Record<string, string> = Object.fromEntries(
     keys.map(key => [key, seriesColor(key)])
   );
 
-  const values = history.flatMap(point => keys.map(key => seriesValue(point, key)));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(1e-9, max - min);
+  const values = history
+    .flatMap(point => keys.map(key => seriesValue(point, key)))
+    .filter(Number.isFinite);
+
+  const rawMin = values.length ? Math.min(...values) : 0;
+  const rawMax = values.length ? Math.max(...values) : 1;
+  const axis = niceAxis(rawMin, rawMax);
+  const span = Math.max(axis.step, axis.max - axis.min);
+
+  // Dynamic Y axis follows the currently selected series.
+  ctx.strokeStyle = "rgba(255,255,255,.12)";
+  ctx.fillStyle = "rgba(255,255,255,.55)";
+  ctx.lineWidth = 1;
+  ctx.font = "9px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
+  const tickCount = Math.max(2, Math.floor((axis.max - axis.min) / axis.step) + 1);
+  for (let tick = 0; tick < tickCount; tick++) {
+    const value = axis.min + axis.step * tick;
+    const py = h - bottom - ((value - axis.min) / span) * plotHeight;
+
+    ctx.beginPath();
+    ctx.moveTo(left, py);
+    ctx.lineTo(w - right, py);
+    ctx.stroke();
+
+    ctx.fillText(formatValue(value), left - 5, py);
+  }
+
   const hoverRatio = hoverX === null ? 0 : hoverX;
-  const hoverIndex = Math.min(history.length - 1, Math.max(0, Math.round(hoverRatio * (history.length - 1))));
+  const hoverIndex = Math.min(
+    history.length - 1,
+    Math.max(0, Math.round(hoverRatio * (history.length - 1)))
+  );
   const hoverPoint = history[hoverIndex];
-  const cursorPx = 5 + hoverRatio * (w - 10);
+  const cursorPx = left + hoverRatio * plotWidth;
 
   if (hoverX !== null) {
     ctx.strokeStyle = "rgba(255,255,255,.35)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cursorPx, 4);
-    ctx.lineTo(cursorPx, h - 4);
+    ctx.moveTo(cursorPx, top);
+    ctx.lineTo(cursorPx, h - bottom);
     ctx.stroke();
 
     if (timeTooltip) {
@@ -490,16 +555,20 @@ function renderLineChart(
     ctx.strokeStyle = palette[key];
     ctx.lineWidth = 2;
     ctx.beginPath();
+
     history.forEach((point, index) => {
-      const px = 5 + index / (history.length - 1) * (w - 10);
-      const py = h - 6 - (seriesValue(point, key) - min) / span * (h - 12);
+      const value = seriesValue(point, key);
+      const px = left + index / (history.length - 1) * plotWidth;
+      const py = h - bottom - (value - axis.min) / span * plotHeight;
       index === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     });
+
     ctx.stroke();
 
     if (hoverX !== null) {
       const value = seriesValue(hoverPoint, key);
-      const py = h - 6 - (value - min) / span * (h - 12);
+      const py = h - bottom - (value - axis.min) / span * plotHeight;
+
       ctx.fillStyle = palette[key];
       ctx.beginPath();
       ctx.arc(cursorPx, py, 6, 0, Math.PI * 2);
@@ -513,15 +582,22 @@ function renderLineChart(
         tooltip.className = "point-tooltip";
         tooltip.style.setProperty("--series-color", palette[key]);
         const tooltipWidth = 120;
-        const left = cursorPx + tooltipWidth + 12 > w ? cursorPx - tooltipWidth - 12 : cursorPx + 10;
-        tooltip.style.left = `${left}px`;
+        const leftPos =
+          cursorPx + tooltipWidth + 12 > w
+            ? cursorPx - tooltipWidth - 12
+            : cursorPx + 10;
+
+        tooltip.style.left = `${leftPos}px`;
         tooltip.style.top = `${Math.max(4, Math.min(h - 28, py - 14))}px`;
-        tooltip.innerHTML = `<span>${seriesLabel(key)}</span><strong>${formatValue(value)} ${seriesUnit(key)}</strong>`;
+        tooltip.innerHTML =
+          `<span>${seriesLabel(key)}</span><strong>${formatValue(value)} ${seriesUnit(key)}</strong>`;
+
         tooltips.appendChild(tooltip);
       }
     }
   });
 }
+
 function renderHistogram(
   canvas: HTMLCanvasElement,
   metric: Metrics,
