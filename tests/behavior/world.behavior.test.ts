@@ -38,15 +38,6 @@ describe("simulation behavioral invariants", () => {
     });
 
     const populations = runDays(world, 10);
-    console.log("MONEY-SERIES", populations);
-    console.log("MONEY-END", world.agents.slice(0, 20).map(agent => ({
-      id: agent.id,
-      job: agent.job,
-      money: agent.money,
-      energy: agent.nutrition.energy.value,
-      fat: agent.nutrition.fat.value
-    })));
-
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
   });
 
@@ -127,7 +118,7 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
-  it("moves workers toward a suddenly absent production", () => {
+  it("moves workers toward suddenly absent heating production", () => {
     const world = new World({
       ...defaultParameters(),
       population: 200,
@@ -137,17 +128,23 @@ describe("simulation behavioral invariants", () => {
       priceSensitivity: 1
     });
 
-    const targetJob = "agriculture_ble" as const;
     for (const agent of world.agents) {
-      if (agent.job === targetJob) agent.job = "agriculture_pomme_de_terre";
+      agent.heatingStock = 0;
+      if (agent.job === "bois_chauffage") agent.job = "agriculture_pomme_de_terre";
     }
 
-    const before = world.agents.filter(agent => agent.job === targetJob).length;
+    const before = world.agents.filter(
+      agent => agent.job === "bois_chauffage"
+    ).length;
     expect(before).toBe(0);
 
     world.step(1440, 1440);
 
-    const after = world.agents.filter(agent => agent.job === targetJob).length;
+    const after = world.agents.filter(
+      agent => agent.job === "bois_chauffage"
+    ).length;
+
+    expect(world.prices.chauffage).toBeGreaterThan(0);
     expect(after).toBeGreaterThan(0);
   });
 
