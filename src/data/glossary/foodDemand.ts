@@ -45,7 +45,7 @@ export function planFoodDemand(
     let bestScore = 0;
 
     for (const good of Object.keys(FOOD_NUTRITION) as Good[]) {
-      const price = prices[good];
+      const price = prices[good] ?? 0;
       const food = FOOD_NUTRITION[good];
       if (!food || !Number.isFinite(price) || price <= 0) continue;
 
