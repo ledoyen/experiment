@@ -373,7 +373,7 @@ export class AppUi {
 
       return `
         <div class="legend-item">
-          <span class="legend-line" style="--series-color:${SERIES_COLORS[key]}"></span>
+          <span class="legend-line" style="--series-color:${seriesColor(key)}"></span>
           <span class="legend-name">${seriesLabel(key)}</span>
           <span class="legend-stats">${t("min")} ${formatValue(min)} · ${t("max")} ${formatValue(max)} · ${t("median")} ${formatValue(med)}</span>
         </div>`;
@@ -504,50 +504,59 @@ function renderHistogram(
   tooltip: HTMLDivElement | null
 ) {
   const { ctx, w, h } = setup(canvas);
-  const values = metric[histogram];
+  const values = metric[histogram].map(value =>
+    Number.isFinite(value) ? Math.max(0, value) : 0
+  );
 
   ctx.fillStyle = "#0d140f";
   ctx.fillRect(0, 0, w, h);
 
   const max = Math.max(1, ...values);
-  const barWidth = w / values.length;
+  const barWidth = w / Math.max(1, values.length);
 
   values.forEach((value, index) => {
-    const barHeight = value / max * (h - 10);
+    const barHeight = Number.isFinite(value) ? value / max * (h - 10) : 0;
     ctx.fillStyle = "#76c7c0";
-    ctx.fillRect(index * barWidth + 2, h - barHeight - 2, barWidth - 4, barHeight);
+    ctx.fillRect(index * barWidth + 2, h - barHeight - 2, Math.max(0, barWidth - 4), barHeight);
   });
 
-  if (tooltip) {
-    tooltip.hidden = hoverX === null;
-  }
+  if (!tooltip) return;
+  tooltip.hidden = hoverX === null || values.length === 0;
+  if (hoverX === null || values.length === 0) return;
 
-  if (hoverX === null) return;
-
-  const index = Math.min(values.length - 1, Math.floor(hoverX * values.length));
+  const index = Math.min(
+    values.length - 1,
+    Math.max(0, Math.floor(hoverX * values.length))
+  );
   const count = values[index];
-  const min = histogram === "wealthBins" ? metric.wealthMin : metric.productivityMin;
-  const maxValue = histogram === "wealthBins" ? metric.wealthMax : metric.productivityMax;
-  const step = maxValue === min ? 0 : (maxValue - min) / values.length;
-  const low = min + step * index;
-  const high = index === values.length - 1 ? maxValue : low + step;
-  const wealthSum = histogram === "wealthBins" ? metric.wealthBinSums[index] : 0;
+
+  const edges = histogram === "wealthBins"
+    ? metric.wealthBinEdges
+    : metric.productivityBinEdges;
+
+  const low = Number.isFinite(edges[index]) ? edges[index] : 0;
+  const rawHigh = Number.isFinite(edges[index + 1]) ? edges[index + 1] : low;
+  const high = Math.max(low, rawHigh);
+
+  const wealthSum = histogram === "wealthBins"
+    ? (Number.isFinite(metric.wealthBinSums[index]) ? metric.wealthBinSums[index] : 0)
+    : 0;
+
   const wealthShare = histogram === "wealthBins" && metric.wealthTotal > 0
     ? (wealthSum / metric.wealthTotal) * 100
     : 0;
 
-  if (tooltip) {
-    const cursorPx = hoverX * w;
-    const tooltipWidth = 160;
-    tooltip.style.left = `${Math.min(w - tooltipWidth - 4, Math.max(4, cursorPx + 8))}px`;
-    tooltip.style.top = "4px";
-    tooltip.innerHTML = `
-      <div class="tooltip-time">${t(histogram === "wealthBins" ? "wealthDistribution" : "productivityDistribution")}</div>
-      <div class="tooltip-row"><span>${t("range")}</span><strong>${formatValue(low)} – ${formatValue(high)}</strong></div>
-      <div class="tooltip-row"><span>${t("individuals")}</span><strong>${count} (${((count / Math.max(1, metric.population)) * 100).toFixed(1)} %)</strong></div>
-      ${histogram === "wealthBins"
-        ? '<div class="tooltip-row"><span>' + t("fortuneSum") + '</span><strong>' + formatValue(wealthSum) + ' (' + wealthShare.toFixed(1) + ' %)</strong></div>'
-        : '<div class="tooltip-row"><span>' + t("share") + '</span><strong>' + ((count / Math.max(1, metric.population)) * 100).toFixed(1) + ' %</strong></div>'}
-    `;
-  }
+  const cursorPx = hoverX * w;
+  const tooltipWidth = 185;
+  tooltip.style.left = `${Math.min(w - tooltipWidth - 4, Math.max(4, cursorPx + 8))}px`;
+  tooltip.style.top = "4px";
+
+  tooltip.innerHTML = `
+    <div class="tooltip-time">${t(histogram === "wealthBins" ? "wealthDistribution" : "productivityDistribution")}</div>
+    <div class="tooltip-row"><span>${t("range")}</span><strong>${formatValue(low)} – ${formatValue(high)}</strong></div>
+    <div class="tooltip-row"><span>${t("individuals")}</span><strong>${count} (${((count / Math.max(1, metric.population)) * 100).toFixed(1)} %)</strong></div>
+    ${histogram === "wealthBins"
+      ? '<div class="tooltip-row"><span>' + t("fortuneSum") + '</span><strong>' + formatValue(wealthSum) + ' (' + wealthShare.toFixed(1) + ' %)</strong></div>'
+      : '<div class="tooltip-row"><span>' + t("share") + '</span><strong>' + ((count / Math.max(1, metric.population)) * 100).toFixed(1) + ' %</strong></div>'}
+  `;
 }
