@@ -137,7 +137,7 @@ describe("simulation behavioral invariants", () => {
 
     for (const agent of world.agents) {
       if (agent.job === "oliviculture") {
-        agent.job = "agriculture_pomme_de_terre";
+        agent.job = "textile";
       }
     }
 
