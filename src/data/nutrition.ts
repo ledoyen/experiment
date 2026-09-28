@@ -130,3 +130,31 @@ export function applyNutritionDay(
   }
   return next;
 }
+
+export function foodToNutrition(food: FoodNutrition, quantityKg: number): Partial<Record<NutritionId, number>> {
+  // Food composition is expressed per 100 g. Market quantities are in kg.
+  const unitsOf100g = quantityKg * 1000 / 100;
+  return {
+    energy: food.kcal * unitsOf100g,
+    protein: food.protein * unitsOf100g,
+    carbohydrate: food.carbohydrate * unitsOf100g,
+    fat: food.fat * unitsOf100g,
+    fiber: food.fiber * unitsOf100g,
+    vitamin_A: food.vitamin_A * unitsOf100g,
+    vitamin_B1: food.vitamin_B1 * unitsOf100g,
+    vitamin_B2: food.vitamin_B2 * unitsOf100g,
+    vitamin_B3: food.vitamin_B3 * unitsOf100g,
+    vitamin_B6: food.vitamin_B6 * unitsOf100g,
+    vitamin_B9: food.vitamin_B9 * unitsOf100g,
+    vitamin_B12: food.vitamin_B12 * unitsOf100g,
+    vitamin_C: food.vitamin_C * unitsOf100g,
+    vitamin_E: food.vitamin_E * unitsOf100g,
+    vitamin_K: food.vitamin_K * unitsOf100g,
+    calcium: food.calcium * unitsOf100g,
+    iron: food.iron * unitsOf100g,
+    magnesium: food.magnesium * unitsOf100g,
+    zinc: food.zinc * unitsOf100g,
+    iodine: food.iodine * unitsOf100g,
+    selenium: food.selenium * unitsOf100g
+  };
+}
