@@ -18,3 +18,4 @@ export * from "./market";
 
 export * from "./budget";
 export * from "./distribution";
+export * from "./storage";
