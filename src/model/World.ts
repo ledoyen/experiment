@@ -1,5 +1,5 @@
-import { ACTIVITIES, ACTIVE_REFERENCE_ETP, DAILY_NEED, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
-import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, type NutritionId } from "../data/nutrition";
+import { ACTIVITIES, ACTIVE_REFERENCE_ETP, DAILY_NEED, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
+import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, type NutritionId } from "../data/nutrition";
 import type { Agent, Good, Job, Metrics, Parameters, Sex, PhysiologyState } from "../data/types";
 
 const activityJobs = ACTIVITIES.map(activity => activity.job);
@@ -107,7 +107,8 @@ export class World {
         money: this.parameters.initialMoney,
         sex: id % 2 === 0 ? "male" : "female",
         physiologyState: "normal",
-        nutrition: createNutritionReserves(id % 2 === 0 ? "male" : "female", "normal")
+        nutrition: createNutritionReserves(id % 2 === 0 ? "male" : "female", "normal"),
+        heatingStock: 1
       };
     });
 
@@ -235,6 +236,10 @@ export class World {
     const previousDay = Math.floor(previousMinute / 1440);
     const currentDay = Math.floor(this.minute / 1440);
     for (let day = previousDay; day < currentDay; day++) {
+      for (const agent of this.agents) {
+        agent.heatingStock = Math.max(0, agent.heatingStock - 1 / 365);
+      }
+
       if (this.parameters.moneyEnabled) {
         this.processMarketDay();
       } else {
@@ -259,93 +264,35 @@ export class World {
       supplies[activity.output] += dailyOutputPerEtp(activity) * agent.productivity;
     }
 
-    const basketCost = Object.keys(DAILY_NEED).reduce((sum, key) => {
-      const good = key as Good;
-      return sum + DAILY_NEED[good] * this.prices[good];
-    }, 0);
-    const affordability = this.agents.map(agent => Math.min(1, agent.money / Math.max(basketCost, 1e-9)));
+    const foodBasketCost = FOOD_GOODS.reduce(
+      (sum, good) => sum + DAILY_NEED[good] * this.prices[good],
+      0
+    );
+
+    const affordability = this.agents.map(agent =>
+      Math.min(1, agent.money / Math.max(foodBasketCost, 1e-9))
+    );
     const totalAffordability = affordability.reduce((sum, value) => sum + value, 0);
+
+    const desiredHeating = this.agents.map(agent =>
+      Math.max(0, 1 - agent.heatingStock)
+    );
+    const totalHeatingDemand = desiredHeating.reduce((sum, value) => sum + value, 0);
 
     const demand = {} as Record<Good, number>;
     const saleFraction = {} as Record<Good, number>;
-    for (const good of Object.keys(this.prices) as Good[]) {
-      demand[good] = DAILY_NEED[good] * totalAffordability;
-      saleFraction[good] = demand[good] > 0 ? Math.min(1, supplies[good] / demand[good]) : 0;
-    }
 
-    for (let index = 0; index < this.agents.length; index++) {
-      const agent = this.agents[index];
-      const affordabilityRatio = affordability[index];
-      let spend = 0;
-      for (const good of Object.keys(this.prices) as Good[]) {
-        if (DAILY_NEED[good] <= 0) continue;
-        spend += DAILY_NEED[good] * this.prices[good] * affordabilityRatio * saleFraction[good];
-      }
-      agent.money = Math.max(0, agent.money - spend);
-    }
+    for (const good of [...FOOD_GOODS, "chauffage" as Good]) {
+      const required =
+        good === "chauffage"
+          ? totalHeatingDemand
+          : DAILY_NEED[good] * this.agents.length;
 
-    // Compute the nutrient intake per fully-fed reference individual once.
-    // Each agent then scales that basket by their affordability ratio.
-    for (const nutrient of NUTRITION) marketIntake[nutrient.id] = 0;
-    for (const good of Object.keys(this.prices) as Good[]) {
-      const quantity = DAILY_NEED[good] * saleFraction[good];
-      const food = FOOD_NUTRITION[good];
-      if (quantity > 0 && food) {
-        marketIntake.energy += quantity * food.kcal / 100;
-        marketIntake.protein += quantity * food.protein / 100;
-        marketIntake.carbohydrate += quantity * food.carbohydrate / 100;
-        marketIntake.fat += quantity * food.fat / 100;
-        marketIntake.fiber += quantity * food.fiber / 100;
-        marketIntake.vitamin_A += quantity * food.vitamin_A / 100;
-        marketIntake.vitamin_B1 += quantity * food.vitamin_B1 / 100;
-        marketIntake.vitamin_B2 += quantity * food.vitamin_B2 / 100;
-        marketIntake.vitamin_B3 += quantity * food.vitamin_B3 / 100;
-        marketIntake.vitamin_B6 += quantity * food.vitamin_B6 / 100;
-        marketIntake.vitamin_B9 += quantity * food.vitamin_B9 / 100;
-        marketIntake.vitamin_B12 += quantity * food.vitamin_B12 / 100;
-        marketIntake.vitamin_C += quantity * food.vitamin_C / 100;
-        marketIntake.vitamin_E += quantity * food.vitamin_E / 100;
-        marketIntake.vitamin_K += quantity * food.vitamin_K / 100;
-        marketIntake.calcium += quantity * food.calcium / 100;
-        marketIntake.iron += quantity * food.iron / 100;
-        marketIntake.magnesium += quantity * food.magnesium / 100;
-        marketIntake.zinc += quantity * food.zinc / 100;
-        marketIntake.iodine += quantity * food.iodine / 100;
-        marketIntake.selenium += quantity * food.selenium / 100;
-      }
-    }
-
-    for (let index = 0; index < this.agents.length; index++) {
-      const agent = this.agents[index];
-      const ratio = affordability[index];
-      const intake = Object.fromEntries(
-        NUTRITION.map(nutrient => [nutrient.id, marketIntake[nutrient.id] * ratio])
-      ) as Partial<Record<NutritionId, number>>;
-      agent.nutrition = applyNutritionDay(
-        agent.nutrition,
-        intake,
-        agent.sex,
-        agent.physiologyState
-      );
-    }
-
-    for (const good of Object.keys(this.prices) as Good[]) {
-      const soldQuantity = demand[good] * saleFraction[good];
-      if (soldQuantity <= 0 || supplies[good] <= 0) continue;
-      const revenue = soldQuantity * this.prices[good];
-      for (const agent of this.agents) {
-        const activity = activityByJob(agent.job);
-        if (!activity || activity.output !== good) continue;
-        const output = dailyOutputPerEtp(activity) * agent.productivity;
-        agent.money += revenue * (output / supplies[good]);
-      }
-    }
-
-    for (const good of Object.keys(this.prices) as Good[]) {
-      const required = DAILY_NEED[good] * this.agents.length;
       if (required <= 0 && supplies[good] <= 0) continue;
+
       const ratio = required / Math.max(supplies[good], 1e-9);
       const bounded = Math.max(-0.20, Math.min(0.20, ratio - 1));
+
       this.prices[good] *= Math.exp(this.parameters.priceSensitivity * bounded);
       this.prices[good] = Math.max(0.001, Math.min(100000, this.prices[good]));
     }
@@ -377,31 +324,15 @@ export class World {
     const intake = {} as Record<NutritionId, number>;
     for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
 
-    for (const good of Object.keys(DAILY_NEED) as Good[]) {
+    for (const good of FOOD_GOODS) {
       const quantity = DAILY_NEED[good];
       const food = FOOD_NUTRITION[good];
       if (quantity <= 0 || !food) continue;
-      intake.energy += quantity * food.kcal / 100;
-      intake.protein += quantity * food.protein / 100;
-      intake.carbohydrate += quantity * food.carbohydrate / 100;
-      intake.fat += quantity * food.fat / 100;
-      intake.fiber += quantity * food.fiber / 100;
-      intake.vitamin_A += quantity * food.vitamin_A / 100;
-      intake.vitamin_B1 += quantity * food.vitamin_B1 / 100;
-      intake.vitamin_B2 += quantity * food.vitamin_B2 / 100;
-      intake.vitamin_B3 += quantity * food.vitamin_B3 / 100;
-      intake.vitamin_B6 += quantity * food.vitamin_B6 / 100;
-      intake.vitamin_B9 += quantity * food.vitamin_B9 / 100;
-      intake.vitamin_B12 += quantity * food.vitamin_B12 / 100;
-      intake.vitamin_C += quantity * food.vitamin_C / 100;
-      intake.vitamin_E += quantity * food.vitamin_E / 100;
-      intake.vitamin_K += quantity * food.vitamin_K / 100;
-      intake.calcium += quantity * food.calcium / 100;
-      intake.iron += quantity * food.iron / 100;
-      intake.magnesium += quantity * food.magnesium / 100;
-      intake.zinc += quantity * food.zinc / 100;
-      intake.iodine += quantity * food.iodine / 100;
-      intake.selenium += quantity * food.selenium / 100;
+
+      const contribution = foodToNutrition(food, quantity);
+      for (const nutrient of NUTRITION) {
+        intake[nutrient.id] += contribution[nutrient.id] ?? 0;
+      }
     }
 
     for (const agent of this.agents) {
