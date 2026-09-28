@@ -642,7 +642,8 @@ export class World {
         agent.nutrition,
         intake,
         agent.sex,
-        agent.physiologyState
+        agent.physiologyState,
+        agent.metabolicFactor
       );
     }
 
