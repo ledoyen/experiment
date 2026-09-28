@@ -30,6 +30,10 @@ export interface BudgetAllocation {
  * - Otherwise every available monetary unit goes to food.
  * - Nothing assigned to lower-priority categories can reduce food spending.
  */
+export function comfortPurchaseAllowed(foodFulfillment: number): boolean {
+  return foodFulfillment >= 1;
+}
+
 export function allocateFoodBeforeComfort(
   availableMoney: number,
   foodBasketCost: number
