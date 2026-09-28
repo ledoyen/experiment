@@ -117,6 +117,8 @@ export class World {
       }
       const angle = Math.random() * Math.PI * 2;
       const radius = 120 + Math.random() * 430;
+      const metabolicFactor =
+        1 + (Math.random() * 2 - 1) * INDIVIDUAL_REQUIREMENT_VARIANCE;
       return {
         id,
         x: this.width / 2 + Math.cos(angle) * radius,
@@ -126,9 +128,7 @@ export class World {
         money: this.parameters.initialMoney,
         sex: id % 2 === 0 ? "male" : "female",
         physiologyState: "normal",
-        metabolicFactor:
-          1 +
-          (Math.random() * 2 - 1) * INDIVIDUAL_REQUIREMENT_VARIANCE,
+        metabolicFactor,
         nutrition: createNutritionReserves(
           id % 2 === 0 ? "male" : "female",
           "normal",
