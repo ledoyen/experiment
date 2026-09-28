@@ -20,7 +20,11 @@ export function costOfNutritionallyCompleteDiet(
   rawPrices: Partial<Record<Good, number>>
 ): number {
   const reserves = createNutritionReserves(sex, state);
-  const prices = rawPrices;
+  const prices = Object.fromEntries(
+    Object.entries(rawPrices).filter(([, price]) =>
+      Number.isFinite(price) && price > 0
+    )
+  ) as Partial<Record<Good, number>>;
   const demand = planFoodDemand(
     reserves,
     sex,
