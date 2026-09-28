@@ -9,6 +9,7 @@ import {
   priceMultiplier,
   seasonalProductionMultiplier,
   shouldSwitchJob,
+  expectedMarginalIncome,
   exponentialDistributionBins,
   linearDistributionBins,
   planFoodDemand,
@@ -312,6 +313,11 @@ export class World {
 
   private processMarketDay(simulationDay: number) {
     const prices = { ...this.prices };
+    const marketSupply = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, this.inventoryTotal(good)])
+    ) as Partial<Record<Good, number>>;
+    marketSupply.chauffage = this.inventoryTotal("chauffage");
+
     const population = Math.max(1, this.agents.length);
     const perCapitaSupply = Object.fromEntries(
       FOOD_GOODS.map(good => [good, this.inventoryTotal(good) / population])
@@ -336,7 +342,7 @@ export class World {
         (sum, plan) => sum + (plan[good] ?? 0),
         0
       );
-      const supply = this.inventoryTotal(good);
+      const supply = marketSupply[good] ?? 0;
 
       foodDemand[good] = demand;
       saleFraction[good] =
@@ -412,7 +418,7 @@ export class World {
       (sum, value) => sum + value,
       0
     );
-    const heatingSupply = this.inventoryTotal("chauffage");
+    const heatingSupply = marketSupply.chauffage ?? 0;
     const heatingSaleFraction =
       totalHeatingDemand > 0
         ? Math.min(1, heatingSupply / totalHeatingDemand)
@@ -458,30 +464,30 @@ export class World {
           ? totalHeatingDemand
           : foodDemand[good];
 
-      const productionLikeSupply =
-        demand > 0
+      const availableSupply = marketSupply[good] ?? 0;
+      const referenceSupply =
+        availableSupply > 0
           ? Math.min(
-              this.inventoryTotal(good),
-              demand * MAX_STORED_FOOD_DAYS_FOR_PRICE
+              availableSupply,
+              Math.max(
+                availableSupply,
+                demand * MAX_STORED_FOOD_DAYS_FOR_PRICE
+              )
             )
           : 0;
 
-      const dailyReferenceSupply =
-        productionLikeSupply > 0
-          ? productionLikeSupply
-          : this.inventoryTotal(good);
-
-      if (demand <= 0 && dailyReferenceSupply <= 0) continue;
+      if (demand <= 0 && referenceSupply <= 0) continue;
 
       this.prices[good] = priceMultiplier(
         this.prices[good],
         demand,
-        dailyReferenceSupply,
+        referenceSupply,
         this.parameters.priceSensitivity
       );
     }
 
-    // Professional mobility follows the income available from today's sales.
+    // Professional mobility is driven by the income a marginal worker
+    // could earn. A missing production therefore creates a scarcity signal.
     const expectedIncome = (agent: Agent, job: Job) => {
       const activity = activityByJob(job);
       if (!activity || activity.dormant) return 0;
@@ -492,12 +498,20 @@ export class World {
         seasonalProductionMultiplier(activity.job, simulationDay);
 
       const good = activity.output;
-      const sale =
+      const demand =
         good === "chauffage"
-          ? heatingSaleFraction
-          : saleFraction[good] ?? 0;
+          ? totalHeatingDemand
+          : foodDemand[good] ?? 0;
 
-      return output * this.prices[good] * sale;
+      const currentSupply =
+        marketSupply[good] ?? 0;
+
+      return expectedMarginalIncome(
+        demand,
+        currentSupply,
+        output,
+        this.prices[good]
+      );
     };
 
     for (const agent of this.agents) {
