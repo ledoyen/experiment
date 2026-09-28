@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_REFERENCE_ETP, DAILY_NEED, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
-import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
   heatingConsumptionForDay,
@@ -63,8 +63,9 @@ export class World {
   parameters: Parameters;
 
   private readonly history: Metrics[] = [];
-  private readonly snapshots: Array<{ minute: number; prices: Record<Good, number>; agents: Agent[] }> = [];
+  private readonly snapshots: Array<{ minute: number; prices: Record<Good, number>; agents: Agent[]; monetaryReserve: number }> = [];
   private moneySupplyTarget = 0;
+  private monetaryReserve = 0;
 
   constructor(parameters: Parameters) {
     this.parameters = structuredClone(parameters);
@@ -75,6 +76,7 @@ export class World {
     this.minute = 0;
     this.prices = { ...INITIAL_PRICE };
     this.moneySupplyTarget = this.parameters.population * this.parameters.initialMoney;
+    this.monetaryReserve = 0;
     this.history.length = 0;
     this.snapshots.length = 0;
 
@@ -146,6 +148,7 @@ export class World {
     this.minute = snapshot.minute;
     this.prices = { ...snapshot.prices };
     this.agents = structuredClone(snapshot.agents);
+    this.monetaryReserve = snapshot.monetaryReserve;
     while (this.history.length && this.history[this.history.length - 1].minute > this.minute) this.history.pop();
   }
 
@@ -159,7 +162,7 @@ export class World {
       medianWealth: median(wealth),
       gini: gini(wealth),
       foodPrice: this.prices.ble,
-      moneySupply: wealthTotal,
+      moneySupply: wealthTotal + this.monetaryReserve,
       prices: { ...this.prices },
       wealthBins: bins(wealth),
       wealthBinSums: binSums(wealth),
@@ -209,7 +212,12 @@ export class World {
   private capture() {
     this.history.push(this.getMetrics());
     this.compactHistory();
-    this.snapshots.push({ minute: this.minute, prices: { ...this.prices }, agents: structuredClone(this.agents) });
+    this.snapshots.push({
+      minute: this.minute,
+      prices: { ...this.prices },
+      agents: structuredClone(this.agents),
+      monetaryReserve: this.monetaryReserve
+    });
     this.compactSnapshots();
   }
 
@@ -392,6 +400,8 @@ export class World {
       );
     }
 
+    this.removeDeadAgents();
+
     // Redistribute exactly what buyers spent to producers.
     for (const good of [...FOOD_GOODS, "chauffage" as Good]) {
       const soldQuantity = demand[good] * saleFraction[good];
@@ -455,10 +465,9 @@ export class World {
     }
 
     // Floating-point correction only: monetary stock remains conserved.
-    const currentSupply = this.agents.reduce(
-      (sum, agent) => sum + agent.money,
-      0
-    );
+    const currentSupply =
+      this.agents.reduce((sum, agent) => sum + agent.money, 0) +
+      this.monetaryReserve;
     const residue = this.moneySupplyTarget - currentSupply;
 
     if (this.agents.length > 0 && Math.abs(residue) > 1e-9) {
@@ -489,6 +498,22 @@ export class World {
         agent.physiologyState
       );
     }
+
+    this.removeDeadAgents();
+  }
+
+  private removeDeadAgents() {
+    const survivors: Agent[] = [];
+
+    for (const agent of this.agents) {
+      if (isLethalNutritionState(agent.nutrition)) {
+        this.monetaryReserve += agent.money;
+      } else {
+        survivors.push(agent);
+      }
+    }
+
+    this.agents = survivors;
   }
 
   private randomProductivity() {
