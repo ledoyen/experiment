@@ -87,3 +87,22 @@ export function expectedMarginalIncome(
     marginalOutput
   ) * safePrice;
 }
+
+
+export function jobSwitchProbability(
+  currentIncome: number,
+  alternativeIncome: number,
+  responsiveness: number
+): number {
+  const current = Number.isFinite(currentIncome) ? Math.max(0, currentIncome) : 0;
+  const alternative = Number.isFinite(alternativeIncome) ? Math.max(0, alternativeIncome) : 0;
+  const response = Number.isFinite(responsiveness)
+    ? Math.max(0, responsiveness)
+    : 0;
+
+  if (alternative <= current || response <= 0) return 0;
+  if (current <= 1e-9) return Math.min(1, 1 - Math.exp(-response * 5));
+
+  const advantage = Math.max(0, alternative / current - 1);
+  return Math.min(1, 1 - Math.exp(-response * advantage * 5));
+}
