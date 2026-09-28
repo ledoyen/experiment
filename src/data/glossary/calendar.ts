@@ -1,23 +1,20 @@
 /**
  * CALENDRIER — glossaire
  *
- * Toutes les hypothèses calendaires de la simulation sont ici.
- * Modifier ces constantes change les saisons sans modifier le moteur.
+ * The simulation year starts in spring. This gives the initial world a growing
+ * season before its first winter, allowing seasonal inventories to emerge.
  */
-
 export const DAYS_PER_YEAR = 365;
 
 export const SEASON_DAY_RANGES = {
-  winter: { start: 1, end: 59 },
-  spring: { start: 60, end: 151 },
-  summer: { start: 152, end: 243 },
-  autumn: { start: 244, end: 334 },
-  winterLate: { start: 335, end: 365 }
+  spring: { start: 1, end: 91 },
+  summer: { start: 92, end: 182 },
+  autumn: { start: 183, end: 273 },
+  winter: { start: 274, end: 365 }
 } as const;
 
-export type Season = "winter" | "spring" | "summer" | "autumn";
+export type Season = "spring" | "summer" | "autumn" | "winter";
 
-/** Converts an absolute simulation day to a 1..365 day-of-year. */
 export function dayOfYear(simulationDay: number): number {
   const zeroBased = Math.max(0, Math.floor(simulationDay) - 1);
   return (zeroBased % DAYS_PER_YEAR) + 1;
@@ -25,13 +22,10 @@ export function dayOfYear(simulationDay: number): number {
 
 export function seasonOfDay(simulationDay: number): Season {
   const day = dayOfYear(simulationDay);
-
-  if (day <= SEASON_DAY_RANGES.winter.end || day >= SEASON_DAY_RANGES.winterLate.start) {
-    return "winter";
-  }
   if (day <= SEASON_DAY_RANGES.spring.end) return "spring";
   if (day <= SEASON_DAY_RANGES.summer.end) return "summer";
-  return "autumn";
+  if (day <= SEASON_DAY_RANGES.autumn.end) return "autumn";
+  return "winter";
 }
 
 export function isHeatingSeason(simulationDay: number): boolean {
