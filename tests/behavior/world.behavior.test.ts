@@ -38,6 +38,14 @@ describe("simulation behavioral invariants", () => {
     });
 
     const populations = runDays(world, 10);
+    console.log("MONEY-SERIES", populations);
+    console.log("MONEY-END", world.agents.slice(0, 20).map(agent => ({
+      id: agent.id,
+      job: agent.job,
+      money: agent.money,
+      energy: agent.nutrition.energy.value,
+      fat: agent.nutrition.fat.value
+    })));
 
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
   });
