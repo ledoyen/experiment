@@ -1,6 +1,13 @@
 import { ACTIVITIES, ACTIVE_REFERENCE_ETP, DAILY_NEED, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
 import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, type NutritionId } from "../data/nutrition";
-import type { Agent, Good, Job, Metrics, Parameters, Sex, PhysiologyState } from "../data/types";
+import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
+import {
+  heatingConsumptionForDay,
+  heatingPurchaseNeed,
+  priceMultiplier,
+  seasonalProductionMultiplier,
+  shouldSwitchJob
+} from "../data/glossary";
 
 const activityJobs = ACTIVITIES.map(activity => activity.job);
 
@@ -236,12 +243,15 @@ export class World {
     const previousDay = Math.floor(previousMinute / 1440);
     const currentDay = Math.floor(this.minute / 1440);
     for (let day = previousDay; day < currentDay; day++) {
+      const simulationDay = day + 1;
+      const heatingConsumption = heatingConsumptionForDay(simulationDay);
+
       for (const agent of this.agents) {
-        agent.heatingStock = Math.max(0, agent.heatingStock - 1 / 365);
+        agent.heatingStock = Math.max(0, agent.heatingStock - heatingConsumption);
       }
 
       if (this.parameters.moneyEnabled) {
-        this.processMarketDay();
+        this.processMarketDay(simulationDay);
       } else {
         this.processCollectiveNutritionDay();
       }
@@ -253,7 +263,7 @@ export class World {
     }
   }
 
-  private processMarketDay() {
+  private processMarketDay(simulationDay: number) {
     const supplies = {} as Record<Good, number>;
     const marketIntake = {} as Record<NutritionId, number>;
 
@@ -264,7 +274,10 @@ export class World {
     for (const agent of this.agents) {
       const activity = activityByJob(agent.job);
       if (!activity || activity.dormant) continue;
-      supplies[activity.output] += dailyOutputPerEtp(activity) * agent.productivity;
+      supplies[activity.output] +=
+        dailyOutputPerEtp(activity) *
+        agent.productivity *
+        seasonalProductionMultiplier(activity.job, simulationDay);
     }
 
     const foodBasketCost = FOOD_GOODS.reduce(
@@ -281,7 +294,7 @@ export class World {
     // Heating is a stock: each person consumes 1 tonne/year and replenishes
     // only when the household stock falls below its target.
     const desiredHeating = this.agents.map(agent =>
-      Math.max(0, 1 - agent.heatingStock)
+      heatingPurchaseNeed(simulationDay, agent.heatingStock)
     );
 
     const demand = {} as Record<Good, number>;
@@ -400,15 +413,11 @@ export class World {
       const required = demand[good];
       if (required <= 0 && supplies[good] <= 0) continue;
 
-      const ratio = required / Math.max(supplies[good], 1e-9);
-      const bounded = Math.max(-0.20, Math.min(0.20, ratio - 1));
-
-      this.prices[good] *= Math.exp(
-        this.parameters.priceSensitivity * bounded
-      );
-      this.prices[good] = Math.max(
-        0.001,
-        Math.min(100000, this.prices[good])
+      this.prices[good] = priceMultiplier(
+        this.prices[good],
+        required,
+        supplies[good],
+        this.parameters.priceSensitivity
       );
     }
 
@@ -428,7 +437,7 @@ export class World {
 
       for (const job of activityJobs) {
         const income = expectedIncome(agent, job);
-        if (income > best * 1.05) {
+        if (shouldSwitchJob(best, income)) {
           best = income;
           bestJob = job;
         }
