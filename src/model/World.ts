@@ -337,7 +337,7 @@ export class World {
         demand > 0 ? Math.min(1, supply / demand) : 0;
     }
 
-    const actualFoodPurchases = this.agents.map(plan => {
+    const actualFoodPurchases = foodPlans.map(plan => {
       const actual = {} as Record<Good, number>;
       for (const good of FOOD_GOODS) {
         actual[good] = (plan[good] ?? 0) * saleFraction[good];
