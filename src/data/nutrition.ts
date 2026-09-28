@@ -51,6 +51,8 @@ export interface FoodNutrition {
   selenium: number;
 }
 
+export const INITIAL_RESERVE_MIN_RATIO = 0.90;
+
 export const NUTRITION: NutritionDefinition[] = [
   { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 2, target: { male: 2500, female: 2000 } },
   { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, target: { male: 58.1, female: 58.1 } },
@@ -96,13 +98,17 @@ export function targetFor(nutrient: NutritionDefinition, sex: Sex, state: Physio
   return nutrient.target[sex];
 }
 
-export function createNutritionReserves(sex: Sex, state: PhysiologyState): NutritionReserves {
+export function createNutritionReserves(
+  sex: Sex,
+  state: PhysiologyState,
+  initialRatio = 1
+): NutritionReserves {
   return Object.fromEntries(
     NUTRITION.map(nutrient => {
       const target = targetFor(nutrient, sex, state);
       const max = target * nutrient.maxDays;
       return [nutrient.id, {
-        value: max,
+        value: max * Math.max(0, Math.min(1, initialRatio)),
         max,
         unit: nutrient.unit,
         labelKey: nutrient.labelKey,
