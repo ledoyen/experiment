@@ -1,5 +1,5 @@
 import type { Parameters, Metrics, Agent, Good } from "../data/types";
-import { CONSUMED_GOODS, GOODS } from "../data/economy";
+import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
 import { NUTRITION, type NutritionId } from "../data/nutrition";
 import { t } from "../i18n";
 import { World } from "../model/World";
@@ -32,8 +32,15 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
 }
 
 function seriesLabel(key: SeriesKey): string {
-  if (key.startsWith("price:")) return t("price") + " — " + t("good." + key.slice(6));
+  if (key.startsWith("price:")) {
+    const good = key.slice(6) as Good;
+    return t("price") + " — " + t("good." + good) + " (" + GOOD_PRICE_UNIT[good] + ")";
+  }
   return t(key);
+}
+
+function seriesUnit(key: SeriesKey): string {
+  return key.startsWith("price:") ? GOOD_PRICE_UNIT[key.slice(6) as Good] : "";
 }
 
 const formatValue = (value: number) => {
@@ -482,7 +489,7 @@ function renderLineChart(
         const left = cursorPx + tooltipWidth + 12 > w ? cursorPx - tooltipWidth - 12 : cursorPx + 10;
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${Math.max(4, Math.min(h - 28, py - 14))}px`;
-        tooltip.innerHTML = `<span>${seriesLabel(key)}</span><strong>${formatValue(value)}</strong>`;
+        tooltip.innerHTML = `<span>${seriesLabel(key)}</span><strong>${formatValue(value)} ${seriesUnit(key)}</strong>`;
         tooltips.appendChild(tooltip);
       }
     }
