@@ -3,6 +3,7 @@ import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, 
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
   allocateFoodBeforeComfort,
+  comfortPurchaseAllowed,
   heatingConsumptionForDay,
   heatingPurchaseNeed,
   priceMultiplier,
@@ -338,15 +339,21 @@ export class World {
       return allocation.remainderAfterFood;
     });
 
-    const affordableHeatingDemand = desiredHeating.reduce(
-      (sum, quantity, index) =>
-        sum +
-        Math.min(
-          quantity,
-          remainingMoneyAfterFood[index] / Math.max(this.prices.chauffage, 1e-9)
-        ),
-      0
-    );
+    const foodFulfillment = FOOD_GOODS.every(
+      good => saleFraction[good] >= 1
+    ) ? 1 : 0;
+
+    const affordableHeatingDemand = comfortPurchaseAllowed(foodFulfillment)
+      ? desiredHeating.reduce(
+          (sum, quantity, index) =>
+            sum +
+            Math.min(
+              quantity,
+              remainingMoneyAfterFood[index] / Math.max(this.prices.chauffage, 1e-9)
+            ),
+          0
+        )
+      : 0;
 
     demand.chauffage = affordableHeatingDemand;
     saleFraction.chauffage =
