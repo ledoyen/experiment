@@ -17,3 +17,4 @@ export * from "./production";
 export * from "./market";
 
 export * from "./budget";
+export * from "./distribution";
