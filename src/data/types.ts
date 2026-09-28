@@ -28,6 +28,15 @@ export interface Agent {
 export interface Metrics {
   minute: number; population: number; medianWealth: number; gini: number; foodPrice: number;
   moneySupply: number; prices: Record<Good, number>;
-  wealthBins: number[]; wealthBinSums: number[]; wealthTotal: number; wealthMin: number; wealthMax: number;
-  productivityBins: number[]; productivityMin: number; productivityMax: number;
+  wealthBins: number[];
+  wealthBinSums: number[];
+  wealthBinEdges: number[];
+  wealthTotal: number;
+  wealthMin: number;
+  wealthMax: number;
+  productivityBins: number[];
+  productivityBinSums: number[];
+  productivityBinEdges: number[];
+  productivityMin: number;
+  productivityMax: number;
 }
