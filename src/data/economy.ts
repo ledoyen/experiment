@@ -32,10 +32,13 @@ const RAW_INITIAL_PRICE: Partial<Record<Good, number>> = {
 
 export const NUTRITIONALLY_CALIBRATED_PRICE_SCALE = initialPriceScale(RAW_INITIAL_PRICE);
 
+export const DEFAULT_RAW_PRICE = 1;
+
 export const INITIAL_PRICE: Record<Good, number> = Object.fromEntries(
   GOODS.map(good => [
     good,
-    (RAW_INITIAL_PRICE[good] ?? 0) * NUTRITIONALLY_CALIBRATED_PRICE_SCALE
+    (RAW_INITIAL_PRICE[good] ?? DEFAULT_RAW_PRICE) *
+      NUTRITIONALLY_CALIBRATED_PRICE_SCALE
   ])
 ) as Record<Good, number>;
 
