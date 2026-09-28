@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
-import { FOOD_NUTRITION, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
   allocateFoodBeforeComfort,
@@ -126,7 +126,11 @@ export class World {
         money: this.parameters.initialMoney,
         sex: id % 2 === 0 ? "male" : "female",
         physiologyState: "normal",
-        nutrition: createNutritionReserves(id % 2 === 0 ? "male" : "female", "normal"),
+        nutrition: createNutritionReserves(
+          id % 2 === 0 ? "male" : "female",
+          "normal",
+          INITIAL_RESERVE_MIN_RATIO + Math.random() * (1 - INITIAL_RESERVE_MIN_RATIO)
+        ),
         heatingStock: 1,
         inventory: {}
       };
