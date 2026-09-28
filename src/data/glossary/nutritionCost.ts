@@ -7,7 +7,8 @@
  *
  * This is only a price-unit calibration; it does not constrain choices.
  */
-import { FOOD_NUTRITION, NUTRITION, createNutritionReserves, foodToNutrition, targetFor } from "../nutrition";
+import { NUTRITION, createNutritionReserves } from "../nutrition";
+import { planFoodDemand } from "./foodDemand";
 import type { Good, PhysiologyState, Sex } from "../types";
 
 export const INITIAL_MONEY_NUMERAIRE = 100;
@@ -19,70 +20,20 @@ export function costOfNutritionallyCompleteDiet(
   rawPrices: Partial<Record<Good, number>>
 ): number {
   const reserves = createNutritionReserves(sex, state);
-  const needs = Object.fromEntries(
-    NUTRITION.map(nutrient => [
-      nutrient.id,
-      targetFor(nutrient, sex, state)
-    ])
-  ) as Record<(typeof NUTRITION)[number]["id"], number>;
+  const prices = rawPrices;
+  const demand = planFoodDemand(
+    reserves,
+    sex,
+    state,
+    Number.POSITIVE_INFINITY,
+    prices
+  );
 
-  let cost = 0;
-
-  for (
-    let round = 0;
-    round < NUTRITION_PRICE_CALIBRATION_ROUNDS;
-    round++
-  ) {
-    let bestGood: Good | null = null;
-    let bestScore = 0;
-    let bestQuantity = 0;
-
-    for (const good of Object.keys(FOOD_NUTRITION) as Good[]) {
-      const price = rawPrices[good] ?? 0;
-      const food = FOOD_NUTRITION[good];
-      if (!food || !Number.isFinite(price) || price <= 0) continue;
-
-      const contribution = foodToNutrition(food, 1);
-      let benefit = 0;
-      let maxUsefulQuantity = Number.POSITIVE_INFINITY;
-
-      for (const nutrient of NUTRITION) {
-        const need = needs[nutrient.id];
-        if (need <= 1e-9) continue;
-        const supplied = contribution[nutrient.id] ?? 0;
-
-        if (supplied > 0) {
-          benefit += Math.min(need, supplied) /
-            Math.max(1e-9, targetFor(nutrient, sex, state));
-          maxUsefulQuantity = Math.min(maxUsefulQuantity, need / supplied);
-        }
-      }
-
-      if (!Number.isFinite(maxUsefulQuantity) || maxUsefulQuantity <= 0 || benefit <= 0) continue;
-
-      const score = benefit / price;
-      if (score > bestScore) {
-        bestScore = score;
-        bestGood = good;
-        bestQuantity = maxUsefulQuantity;
-      }
-    }
-
-    if (!bestGood || bestQuantity <= 0) break;
-
-    const price = rawPrices[bestGood] ?? 0;
-    cost += bestQuantity * price;
-
-    const contribution = foodToNutrition(FOOD_NUTRITION[bestGood]!, bestQuantity);
-    for (const nutrient of NUTRITION) {
-      needs[nutrient.id] = Math.max(
-        0,
-        needs[nutrient.id] - (contribution[nutrient.id] ?? 0)
-      );
-    }
-  }
-
-  return cost;
+  return Object.entries(demand).reduce(
+    (sum, [good, quantity]) =>
+      sum + quantity * (prices[good as Good] ?? 0),
+    0
+  );
 }
 
 export function initialPriceScale(
