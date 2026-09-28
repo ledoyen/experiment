@@ -92,5 +92,8 @@
   "phys.magnesium": "Magnésium",
   "phys.zinc": "Zinc",
   "phys.iodine": "Iode",
-  "phys.selenium": "Sélénium"
+  "phys.selenium": "Sélénium",
+  "livingPopulation": "Individus vivants",
+  "month": "mois",
+  "year": "année"
 }
