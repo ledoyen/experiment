@@ -14,7 +14,7 @@ export const MAX_HEATING_STOCK_TONNES_PER_PERSON = 1;
  * Tonnes burned by one person on a day that belongs to winter.
  * Annual consumption remains exactly the configured annual amount.
  */
-export const WINTER_HEATING_DAYS = 90;
+export const WINTER_HEATING_DAYS = 92;
 export const DAILY_WINTER_HEATING_TONNES_PER_PERSON =
   ANNUAL_HEATING_TONNES_PER_PERSON / WINTER_HEATING_DAYS;
 
