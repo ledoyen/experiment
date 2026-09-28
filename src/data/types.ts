@@ -22,6 +22,7 @@ import type { NutritionReserves } from "./nutrition";
 export interface Agent {
   id: number; x: number; y: number; job: Job; productivity: number; money: number;
   sex: Sex; physiologyState: PhysiologyState; nutrition: NutritionReserves;
+  metabolicFactor: number;
   heatingStock: number;
   inventory: Partial<Record<Good, number>>;
 }
