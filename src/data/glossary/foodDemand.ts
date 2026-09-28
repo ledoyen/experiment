@@ -26,8 +26,7 @@ export function planFoodDemand(
   sex: Sex,
   state: PhysiologyState,
   availableMoney: number,
-  prices: Partial<Record<Good, number>>,
-  availableQuantities?: Partial<Record<Good, number>>
+  prices: Partial<Record<Good, number>>
 ): Record<Good, number> {
   const demand = {} as Record<Good, number>;
   for (const good of Object.keys(FOOD_NUTRITION) as Good[]) demand[good] = 0;
@@ -67,16 +66,9 @@ export function planFoodDemand(
 
       if (!Number.isFinite(maxUsefulQuantity) || maxUsefulQuantity <= 0 || benefit <= 0) continue;
 
-      const alreadyRequested = demand[good] ?? 0;
-      const physicalLimit =
-        availableQuantities?.[good] === undefined
-          ? Number.POSITIVE_INFINITY
-          : Math.max(0, availableQuantities[good]! - alreadyRequested);
-
       const quantity = Math.min(
         maxUsefulQuantity,
-        moneyLeft / price,
-        physicalLimit
+        moneyLeft / price
       );
       const score = quantity > 0 ? benefit / price : 0;
 
