@@ -69,20 +69,42 @@ export class World {
     this.snapshots.length = 0;
 
     const referenceCounts = new Map<Job, number>();
+    const allocations: Array<{
+      job: Job;
+      exact: number;
+      count: number;
+      fraction: number;
+    }> = [];
+
     let assigned = 0;
 
     for (const activity of ACTIVITIES) {
       if (activity.dormant || activity.referenceEtp <= 0) continue;
-      const count = Math.floor(this.parameters.population * activity.referenceEtp / Math.max(ACTIVE_REFERENCE_ETP, 1));
-      referenceCounts.set(activity.job, count);
+
+      const exact =
+        this.parameters.population *
+        activity.referenceEtp /
+        Math.max(ACTIVE_REFERENCE_ETP, 1);
+
+      const count = Math.floor(exact);
+      allocations.push({
+        job: activity.job,
+        exact,
+        count,
+        fraction: exact - count
+      });
       assigned += count;
     }
 
     let remaining = Math.max(0, this.parameters.population - assigned);
-    const candidates = ACTIVITIES.filter(activity => !activity.dormant && activity.referenceEtp > 0);
-    for (let i = 0; i < remaining && candidates.length > 0; i++) {
-      const activity = candidates[i % candidates.length];
-      referenceCounts.set(activity.job, (referenceCounts.get(activity.job) ?? 0) + 1);
+    allocations.sort((a, b) => b.fraction - a.fraction);
+
+    for (let i = 0; i < allocations.length && remaining > 0; i++, remaining--) {
+      allocations[i].count += 1;
+    }
+
+    for (const allocation of allocations) {
+      referenceCounts.set(allocation.job, allocation.count);
     }
 
     this.agents = Array.from({ length: this.parameters.population }, (_, id) => {
