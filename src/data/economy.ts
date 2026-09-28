@@ -24,7 +24,7 @@ export const CONSUMED_GOODS: Good[] = [
 export const DAILY_NEED: Record<Good, number> = {
   ble: 0.300, pomme_de_terre: 0.300, legumineuses: 0.100, legumes: 0.400, fruits: 0.300,
   huile_olive: 0.025, lait: 0.400, oeufs: 0.050, volaille: 0, porc: 0, poisson: 0.100, gibier: 0,
-  vetement: 1 / 365, chauffage: 1 / 365, outil: 0.30 / 365, logement: 0
+  vetement: 1 / 365, chauffage: 0, outil: 0.30 / 365, logement: 0
 };
 
 const RAW_INITIAL_PRICE: Partial<Record<Good, number>> = {
