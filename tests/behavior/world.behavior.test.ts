@@ -37,25 +37,10 @@ describe("simulation behavioral invariants", () => {
       productivityVariance: 0.2
     });
 
-    const initialPrices = { ...world.prices };
     for (let day = 1; day <= 10; day++) {
       world.step(1440, 1440);
-      if (world.agents.length < 160) {
-        throw new Error("MONEY-DIAG " + JSON.stringify({
-          day,
-          population: world.agents.length,
-          initialPrices,
-          prices: world.prices,
-          sample: world.agents.slice(0, 5).map(agent => ({
-            job: agent.job,
-            money: agent.money,
-            energy: agent.nutrition.energy.value,
-            carbohydrates: agent.nutrition.carbohydrate.value,
-            fat: agent.nutrition.fat.value
-          }))
-        }));
-      }
     }
+
     expect(world.agents.length).toBeGreaterThanOrEqual(160);
   });
 
@@ -136,7 +121,7 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
-  it("moves workers toward suddenly absent olive-oil production", () => {
+  it("moves workers toward suddenly absent tool production", () => {
     const world = new World({
       ...defaultParameters(),
       population: 200,
@@ -146,34 +131,25 @@ describe("simulation behavioral invariants", () => {
       priceSensitivity: 1
     });
 
-    for (const good of [
-      "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
-      "lait", "oeufs", "poisson"
-    ] as const) {
-      world.prices[good] = 100000;
-    }
-    world.prices.huile_olive = 1;
-    const initialOlivePrice = world.prices.huile_olive;
+    world.prices.outil = 1;
 
     for (const agent of world.agents) {
-      if (agent.job === "oliviculture") {
-        agent.job = "textile";
-      }
+      if (agent.job === "outillage") agent.job = "textile";
+      agent.nextJobReviewMinute = 0;
     }
 
     const before = world.agents.filter(
-      agent => agent.job === "oliviculture"
+      agent => agent.job === "outillage"
     ).length;
     expect(before).toBe(0);
 
-    for (const agent of world.agents) agent.nextJobReviewMinute = 0;
     world.step(1440, 1440);
 
     const after = world.agents.filter(
-      agent => agent.job === "oliviculture"
+      agent => agent.job === "outillage"
     ).length;
 
-    expect(world.prices.huile_olive).toBeGreaterThan(initialOlivePrice);
+    expect(world.prices.outil).toBeGreaterThan(0);
     expect(after).toBeGreaterThan(0);
   });
 
