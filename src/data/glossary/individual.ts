@@ -50,6 +50,23 @@ export function descendingIntoCritical(
 
 export const CAREER_REVIEW_MIN_DAYS = 7;
 export const CAREER_REVIEW_MAX_DAYS = 30;
+export const EMERGENCY_CAREER_REVIEW_RUNWAY_DAYS = 1.25;
+export const EMERGENCY_CAREER_ENERGY_RATIO = 0.45;
+
+export function careerReviewIsUrgent(
+  money: number,
+  plannedFoodSpend: number,
+  energyRatio: number
+): boolean {
+  const runway = Math.max(0, plannedFoodSpend) *
+    EMERGENCY_CAREER_REVIEW_RUNWAY_DAYS;
+  return (
+    Number.isFinite(money) &&
+    money <= runway ||
+    Number.isFinite(energyRatio) &&
+    energyRatio <= EMERGENCY_CAREER_ENERGY_RATIO
+  );
+}
 
 export function careerReviewDelayMinutes(random01: number): number {
   const u = Math.max(0, Math.min(1, Number.isFinite(random01) ? random01 : 0));
