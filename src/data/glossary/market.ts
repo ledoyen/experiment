@@ -10,6 +10,7 @@ export const PRICE_MAX = 100000;
 export const PRICE_RESPONSE_CLAMP = 0.20;
 export const JOB_SWITCH_PREMIUM = 0.05;
 export const FINITE_FALLBACK_PRICE = 1;
+export const MAX_DAILY_JOB_SWITCH_PROBABILITY = 0.15;
 
 export function boundedSupplyDemandRatio(
   demand: number,
@@ -104,5 +105,6 @@ export function jobSwitchProbability(
   if (current <= 1e-9) return Math.min(1, 1 - Math.exp(-response * 5));
 
   const advantage = Math.max(0, alternative / current - 1);
-  return Math.min(1, 1 - Math.exp(-response * advantage * 5));
+  const rawProbability = 1 - Math.exp(-response * advantage * 5);
+  return Math.min(MAX_DAILY_JOB_SWITCH_PROBABILITY, rawProbability);
 }
