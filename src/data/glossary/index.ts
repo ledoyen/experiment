@@ -22,3 +22,4 @@ export * from "./storage";
 export * from "./foodDemand";
 export * from "./time";
 export * from "./nutritionCost";
+export * from "./individual";
