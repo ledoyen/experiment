@@ -148,6 +148,7 @@ describe("simulation behavioral invariants", () => {
     ).length;
     expect(before).toBe(0);
 
+    for (const agent of world.agents) agent.nextJobReviewMinute = 0;
     world.step(1440, 1440);
 
     const after = world.agents.filter(
