@@ -2,8 +2,8 @@ import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityBy
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
-  allocateFoodBeforeComfort,
-  comfortPurchaseAllowed,
+  descendingIntoCritical,
+  careerReviewDelayMinutes,
   heatingConsumptionForDay,
   heatingPurchaseNeed,
   priceMultiplier,
@@ -136,7 +136,9 @@ export class World {
           metabolicFactor
         ),
         heatingStock: 1,
-        inventory: {}
+        inventory: {},
+        events: [],
+        nextJobReviewMinute: careerReviewDelayMinutes(Math.random())
       };
     });
 
@@ -177,6 +179,7 @@ export class World {
     const wealthDistribution = exponentialDistributionBins(wealth);
     const productivityDistribution = linearDistributionBins(productivity);
     const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
+    const jobCounts = this.getJobCounts();
 
     return {
       minute: this.minute,
@@ -198,7 +201,8 @@ export class World {
       productivityBinSums: productivityDistribution.sums,
       productivityBinEdges: productivityDistribution.edges,
       productivityMin: productivity.length ? Math.min(...productivity) : 0,
-      productivityMax: productivity.length ? Math.max(...productivity) : 0
+      productivityMax: productivity.length ? Math.max(...productivity) : 0,
+      jobCounts
     };
   }
 
@@ -211,6 +215,10 @@ export class World {
     const last = this.history[this.history.length - 1];
     if (last && result[result.length - 1] !== last) result.push(last);
     return result;
+  }
+
+  getAgentEvents(agentId: number) {
+    return [...(this.agents.find(agent => agent.id === agentId)?.events ?? [])];
   }
 
   getJobCounts(): Record<Job, number> {
@@ -418,6 +426,7 @@ export class World {
         }
       }
 
+      const previousNutrition = agent.nutrition;
       agent.nutrition = applyNutritionDay(
         agent.nutrition,
         intake,
@@ -425,6 +434,19 @@ export class World {
         agent.physiologyState,
         agent.metabolicFactor
       );
+
+      const critical = descendingIntoCritical(
+        previousNutrition,
+        agent.nutrition
+      );
+      if (critical) {
+        agent.events.push({
+          minute: simulationDay * 1440,
+          type: "healthCritical",
+          nutrient: critical.nutrient,
+          ratio: critical.ratio
+        });
+      }
     }
 
     // Heating is a lower priority than food.
@@ -542,7 +564,11 @@ export class World {
       );
     };
 
+    const currentMinute = simulationDay * 1440;
+
     for (const agent of this.agents) {
+      if (currentMinute < agent.nextJobReviewMinute) continue;
+
       const current = expectedIncome(agent, agent.job);
       let bestJob = agent.job;
       let best = current;
@@ -563,8 +589,21 @@ export class World {
           this.parameters.mobility
         )
       ) {
+        const previousJob = agent.job;
+        const previousIncome = current;
         agent.job = bestJob;
+        agent.events.push({
+          minute: currentMinute,
+          type: "jobChange",
+          previousJob,
+          newJob: bestJob,
+          previousIncome,
+          expectedIncome: best
+        });
       }
+
+      agent.nextJobReviewMinute =
+        currentMinute + careerReviewDelayMinutes(Math.random());
     }
 
     this.removeDeadAgents();
@@ -638,13 +677,27 @@ export class World {
         // owners' stocks proportionally after the allocation below.
       }
 
+      const previousNutrition = agent.nutrition;
       agent.nutrition = applyNutritionDay(
-        agent.nutrition,
+        previousNutrition,
         intake,
         agent.sex,
         agent.physiologyState,
         agent.metabolicFactor
       );
+
+      const critical = descendingIntoCritical(
+        previousNutrition,
+        agent.nutrition
+      );
+      if (critical) {
+        agent.events.push({
+          minute: this.minute,
+          type: "healthCritical",
+          nutrient: critical.nutrient,
+          ratio: critical.ratio
+        });
+      }
     }
 
     // Remove consumed food from commodity stocks proportionally.
