@@ -1,4 +1,4 @@
-import type { Parameters, Metrics, Agent, Good } from "../data/types";
+import type { Parameters, Metrics, Agent, AgentEvent, Good, Job } from "../data/types";
 import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
 import { NUTRITION, type NutritionId } from "../data/nutrition";
 import { chartTimeResolution, simulationTimeParts } from "../data/glossary";
@@ -7,7 +7,7 @@ import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 
 type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population";
-type SeriesKey = BaseSeriesKey | `price:${Good}`;
+type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
 const SERIES_COLORS: Record<string, string> = {
@@ -17,7 +17,14 @@ const SERIES_COLORS: Record<string, string> = {
   population: "#ff9f68"
 };
 
+const PRICE_CURRENCY_SYMBOL = "🪙";
 const PRICE_COLORS = ["#72b7ff", "#8dd3c7", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#bc80bd", "#ccebc5", "#ffed6f", "#a6cee3"];
+const JOB_SERIES_COLORS: Record<Job, string> = {
+  agriculture_ble: "#7f9f5b", agriculture_pomme_de_terre: "#91a86b", agriculture_legumineuses: "#6e8f4e",
+  horticulture_legumes: "#88a96b", arboriculture_fruits: "#4f7f47", oliviculture: "#667f3b",
+  "élevage_lait": "#c49a6c", aviculture_oeufs: "#d1b66f", pêche: "#5d91b8", chasse: "#8d6e63",
+  textile: "#9b72a6", construction: "#b27a4e", bois_chauffage: "#5f4a3c", outillage: "#707070", idle: "#9aa39b"
+};
 
 function seriesColor(key: SeriesKey): string {
   if (key.startsWith("price:")) {
@@ -25,24 +32,30 @@ function seriesColor(key: SeriesKey): string {
     const index = GOODS.indexOf(good);
     return PRICE_COLORS[index % PRICE_COLORS.length];
   }
+  if (key.startsWith("job:")) return JOB_SERIES_COLORS[key.slice(4) as Job];
   return SERIES_COLORS[key];
 }
 
 function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key.startsWith("price:")) return point.prices[key.slice(6) as Good];
+  if (key.startsWith("job:")) return point.jobCounts[key.slice(4) as Job] ?? 0;
   return Number(point[key as BaseSeriesKey]);
 }
 
 function seriesLabel(key: SeriesKey): string {
   if (key.startsWith("price:")) {
     const good = key.slice(6) as Good;
-    return t("price") + " — " + t("good." + good) + " (" + GOOD_PRICE_UNIT[good] + ")";
+    return t("price") + " — " + t("good." + good) +
+      " (" + PRICE_CURRENCY_SYMBOL + " / " + GOOD_PRICE_UNIT[good] + ")";
   }
+  if (key.startsWith("job:")) return t("job." + key.slice(4));
   return t(key);
 }
 
 function seriesUnit(key: SeriesKey): string {
-  return key.startsWith("price:") ? GOOD_PRICE_UNIT[key.slice(6) as Good] : "";
+  return key.startsWith("price:")
+    ? PRICE_CURRENCY_SYMBOL + " / " + GOOD_PRICE_UNIT[key.slice(6) as Good]
+    : "";
 }
 
 const formatValue = (value: number) => {
@@ -116,6 +129,13 @@ export class AppUi {
           </div>
         </details>
 
+        <details class="price-choices">
+          <summary>${t("populationByJob")}</summary>
+          <div class="choices">
+            ${Object.keys(JOB_SERIES_COLORS).filter(job => job !== "idle").map(job => this.check(("job:" + job) as SeriesKey, "job." + job)).join("")}
+          </div>
+        </details>
+
         <div class="choices">
           <label><input type="radio" name="hist" value="wealthBins" checked> ${t("wealthDistribution")}</label>
           <label><input type="radio" name="hist" value="productivityBins"> ${t("productivityDistribution")}</label>
@@ -124,6 +144,22 @@ export class AppUi {
 
       <div id="population-legend" class="population-legend"></div>
       <div id="agent-tooltip" class="agent-tooltip" hidden></div>
+
+      <div id="agent-modal" class="agent-modal" hidden>
+        <div class="agent-modal-backdrop" data-agent-modal-close></div>
+        <section class="agent-modal-card" role="dialog" aria-modal="true">
+          <header class="agent-modal-header">
+            <strong id="agent-modal-title"></strong>
+            <button id="agent-modal-close" type="button" title="${t("close")}">×</button>
+          </header>
+          <nav class="agent-modal-tabs">
+            <button type="button" data-agent-tab="profile" class="active">${t("agentProfile")}</button>
+            <button type="button" data-agent-tab="events">${t("agentHistory")}</button>
+          </nav>
+          <div id="agent-modal-profile" class="agent-modal-content"></div>
+          <div id="agent-modal-events" class="agent-modal-content" hidden></div>
+        </section>
+      </div>
 
       <aside class="drawer">
         <button id="drawer-toggle">⚙</button>
@@ -152,6 +188,9 @@ export class AppUi {
 
     this.view.setAgentHoverHandler((agent, screenX, screenY) => {
       this.updateAgentTooltip(agent, screenX, screenY);
+    });
+    this.view.setAgentClickHandler((agent) => {
+      if (agent) this.openAgentModal(agent);
     });
 
     this.bind();
@@ -207,6 +246,19 @@ export class AppUi {
 
     this.ui.querySelector("#money")?.addEventListener("change", event => {
       this.world.setParameters({ moneyEnabled: (event.target as HTMLInputElement).checked });
+    });
+
+    this.ui.querySelector("#agent-modal-close")?.addEventListener("click", () => this.closeAgentModal());
+    this.ui.querySelector("[data-agent-modal-close]")?.addEventListener("click", () => this.closeAgentModal());
+    this.ui.querySelectorAll<HTMLButtonElement>("[data-agent-tab]").forEach(button => {
+      button.addEventListener("click", () => {
+        const tab = button.dataset.agentTab;
+        this.ui.querySelectorAll<HTMLButtonElement>("[data-agent-tab]").forEach(item => item.classList.toggle("active", item === button));
+        const profile = this.ui.querySelector<HTMLElement>("#agent-modal-profile");
+        const events = this.ui.querySelector<HTMLElement>("#agent-modal-events");
+        if (profile) profile.hidden = tab !== "profile";
+        if (events) events.hidden = tab !== "events";
+      });
     });
 
     this.ui.querySelectorAll<HTMLInputElement>("[data-series]").forEach(input => input.addEventListener("change", () => {
