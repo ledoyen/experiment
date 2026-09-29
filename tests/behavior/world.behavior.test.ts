@@ -38,23 +38,24 @@ describe("simulation behavioral invariants", () => {
     });
 
     const initialPrices = { ...world.prices };
-    world.step(1440, 1440);
-    const day1Prices = { ...world.prices };
-    if (world.agents.length < 160) {
-      throw new Error("MONEY-DIAG " + JSON.stringify({
-        populationDay1: world.agents.length,
-        initialPrices,
-        day1Prices,
-        sample: world.agents.slice(0, 5).map(agent => ({
-          job: agent.job,
-          money: agent.money,
-          energy: agent.nutrition.energy.value,
-          carbohydrates: agent.nutrition.carbohydrate.value,
-          fat: agent.nutrition.fat.value
-        }))
-      }));
+    for (let day = 1; day <= 10; day++) {
+      world.step(1440, 1440);
+      if (world.agents.length < 160) {
+        throw new Error("MONEY-DIAG " + JSON.stringify({
+          day,
+          population: world.agents.length,
+          initialPrices,
+          prices: world.prices,
+          sample: world.agents.slice(0, 5).map(agent => ({
+            job: agent.job,
+            money: agent.money,
+            energy: agent.nutrition.energy.value,
+            carbohydrates: agent.nutrition.carbohydrate.value,
+            fat: agent.nutrition.fat.value
+          }))
+        }));
+      }
     }
-    for (let day = 1; day < 10; day++) world.step(1440, 1440);
     expect(world.agents.length).toBeGreaterThanOrEqual(160);
   });
 
