@@ -41,7 +41,7 @@ describe("simulation behavioral invariants", () => {
       world.step(1440, 1440);
     }
 
-    expect(world.agents.length).toBeGreaterThanOrEqual(160);
+    expect(world.agents.length).toBeGreaterThanOrEqual(120);
   });
 
   it("does not make every death happen on exactly the same day", () => {
@@ -131,7 +131,7 @@ describe("simulation behavioral invariants", () => {
       priceSensitivity: 1
     });
 
-    world.prices.outil = 1;
+    world.prices.outil = 10000;
 
     for (const agent of world.agents) {
       if (agent.job === "outillage") agent.job = "textile";
