@@ -17,7 +17,23 @@ export interface Parameters {
   priceSensitivity: number; productivityVariance: number;
 }
 
-import type { NutritionReserves } from "./nutrition";
+import type { NutritionId, NutritionReserves } from "./nutrition";
+
+export type AgentEvent =
+  | {
+      minute: number;
+      type: "healthCritical";
+      nutrient: NutritionId;
+      ratio: number;
+    }
+  | {
+      minute: number;
+      type: "jobChange";
+      previousJob: Job;
+      newJob: Job;
+      previousIncome: number;
+      expectedIncome: number;
+    };
 
 export interface Agent {
   id: number; x: number; y: number; job: Job; productivity: number; money: number;
@@ -25,6 +41,8 @@ export interface Agent {
   metabolicFactor: number;
   heatingStock: number;
   inventory: Partial<Record<Good, number>>;
+  events: AgentEvent[];
+  nextJobReviewMinute: number;
 }
 
 export interface Metrics {
@@ -41,4 +59,5 @@ export interface Metrics {
   productivityBinEdges: number[];
   productivityMin: number;
   productivityMax: number;
+  jobCounts: Record<Job, number>;
 }
