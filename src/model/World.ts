@@ -4,6 +4,7 @@ import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
   careerReviewDelayMinutes,
+  careerReviewIsUrgent,
   heatingConsumptionForDay,
   heatingPurchaseNeed,
   dailyMaintenanceNeed,
@@ -601,8 +602,22 @@ export class World {
 
     const currentMinute = simulationDay * 1440;
 
-    for (const agent of this.agents) {
-      if (currentMinute < agent.nextJobReviewMinute) continue;
+    for (let index = 0; index < this.agents.length; index++) {
+      const agent = this.agents[index];
+      const plannedFoodSpend = FOOD_GOODS.reduce(
+        (sum, good) => sum + (foodPlans[index][good] ?? 0) * prices[good],
+        0
+      );
+      const energyReserve = agent.nutrition.energy;
+      const energyRatio =
+        energyReserve.max > 0 ? energyReserve.value / energyReserve.max : 0;
+      const urgentReview = careerReviewIsUrgent(
+        agent.money,
+        plannedFoodSpend,
+        energyRatio
+      );
+
+      if (currentMinute < agent.nextJobReviewMinute && !urgentReview) continue;
 
       const current = expectedIncome(agent, agent.job);
       let bestJob = agent.job;
