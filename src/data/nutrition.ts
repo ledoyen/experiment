@@ -130,7 +130,7 @@ export function applyNutritionDay(
   const next = { ...reserves };
   for (const nutrient of NUTRITION) {
     const current = reserves[nutrient.id];
-    const target = targetFor(nutrient, sex, state);
+    const target = targetFor(nutrient, sex, state) * requirementFactor;
     const absorbed = intake[nutrient.id] ?? 0;
     next[nutrient.id] = {
       ...current,
