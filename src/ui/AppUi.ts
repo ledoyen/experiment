@@ -366,58 +366,108 @@ export class AppUi {
     }
 
     tooltip.hidden = false;
-    const width = 300;
+    const width = 250;
     tooltip.style.left = `${Math.min(window.innerWidth - width - 12, Math.max(8, screenX + 14))}px`;
     tooltip.style.top = `${Math.min(window.innerHeight - 12, Math.max(12, screenY + 14))}px`;
+    tooltip.innerHTML = this.agentProfileMarkup(agent, false);
+  }
 
-    const sections: Array<{ title: string; ids: NutritionId[] }> = [
-      {
-        title: t("phys.section.energy"),
-        ids: ["energy"]
-      },
-      {
-        title: t("phys.section.macros"),
-        ids: ["protein", "carbohydrate", "fat", "fiber"]
-      },
-      {
-        title: t("phys.section.vitamins"),
-        ids: ["vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3", "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C", "vitamin_E", "vitamin_K"]
-      },
-      {
-        title: t("phys.section.minerals"),
-        ids: ["calcium", "iron", "magnesium", "zinc", "iodine", "selenium"]
-      }
-    ];
-
-    tooltip.innerHTML = `
+  private agentProfileMarkup(agent: Agent, full: boolean) {
+    const topRows = `
       <div class="agent-tooltip-title">#${agent.id}</div>
       <div class="agent-row"><span>${t("sex")}</span><strong>${t(`sex.${agent.sex}`)}</strong></div>
       <div class="agent-row"><span>${t("physiologyState")}</span><strong>${t(`physiology.${agent.physiologyState}`)}</strong></div>
       <div class="agent-row"><span>${t("job")}</span><strong>${t(`job.${agent.job}`)}</strong></div>
       <div class="agent-row"><span>${t("productivity")}</span><strong>${formatValue(agent.productivity)}</strong></div>
       <div class="agent-row"><span>${t("money")}</span><strong>${formatValue(agent.money)}</strong></div>
-      <div class="agent-row"><span>${t("position")}</span><strong>${Math.round(agent.x)}, ${Math.round(agent.y)}</strong></div>
-      <div class="physiology-gauges">
+      <div class="agent-row"><span>${t("position")}</span><strong>${Math.round(agent.x)}, ${Math.round(agent.y)}</strong></div>`;
+
+    if (!full) return topRows + this.nutritionGaugeMarkup(agent, ["energy"]);
+
+    const sections: Array<{ title: string; ids: NutritionId[] }> = [
+      { title: t("phys.section.energy"), ids: ["energy"] },
+      { title: t("phys.section.macros"), ids: ["protein", "carbohydrate", "fat", "fiber"] },
+      { title: t("phys.section.vitamins"), ids: ["vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3", "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C", "vitamin_E", "vitamin_K"] },
+      { title: t("phys.section.minerals"), ids: ["calcium", "iron", "magnesium", "zinc", "iodine", "selenium"] }
+    ];
+
+    return topRows + `
+      <div class="physiology-gauges full-profile">
         ${sections.map(section => `
           <div class="phys-section-title">${section.title}</div>
-          ${section.ids.map(id => {
-            const reserve = agent.nutrition[id];
-            const percent = reserve.max > 0 ? Math.max(0, Math.min(100, reserve.value / reserve.max * 100)) : 0;
-            return `
-              <div class="phys-gauge">
-                <div class="phys-gauge-head">
-                  <span>${t(reserve.labelKey)}</span>
-                  <strong>${formatReserve(reserve.value)} ${reserve.unit} · ${percent.toFixed(0)}%</strong>
-                </div>
-                <div class="phys-gauge-track">
-                  <div class="phys-gauge-fill" style="width:${percent}%"></div>
-                </div>
-              </div>`;
-          }).join("")}
+          ${this.nutritionGaugeMarkup(agent, section.ids)}
         `).join("")}
       </div>`;
   }
 
+  private nutritionGaugeMarkup(agent: Agent, ids: NutritionId[]) {
+    return ids.map(id => {
+      const reserve = agent.nutrition[id];
+      const percent = reserve.max > 0 ? Math.max(0, Math.min(100, reserve.value / reserve.max * 100)) : 0;
+      return `
+        <div class="phys-gauge">
+          <div class="phys-gauge-head">
+            <span>${t(reserve.labelKey)}</span>
+            <strong>${formatReserve(reserve.value)} ${reserve.unit} · ${percent.toFixed(0)}%</strong>
+          </div>
+          <div class="phys-gauge-track"><div class="phys-gauge-fill" style="width:${percent}%"></div></div>
+        </div>`;
+    }).join("");
+  }
+
+  private openAgentModal(agent: Agent) {
+    const modal = this.ui.querySelector<HTMLDivElement>("#agent-modal");
+    if (!modal) return;
+
+    const title = this.ui.querySelector<HTMLElement>("#agent-modal-title");
+    if (title) title.textContent = `#${agent.id}`;
+
+    const profile = this.ui.querySelector<HTMLElement>("#agent-modal-profile");
+    if (profile) {
+      profile.hidden = false;
+      profile.innerHTML = this.agentProfileMarkup(agent, true);
+    }
+
+    const events = this.ui.querySelector<HTMLElement>("#agent-modal-events");
+    if (events) {
+      events.hidden = true;
+      events.innerHTML = this.agentEventsMarkup(agent);
+    }
+
+    this.ui.querySelectorAll<HTMLButtonElement>("[data-agent-tab]").forEach((button, index) => button.classList.toggle("active", index === 0));
+    modal.hidden = false;
+  }
+
+  private closeAgentModal() {
+    const modal = this.ui.querySelector<HTMLDivElement>("#agent-modal");
+    if (modal) modal.hidden = true;
+  }
+
+  private agentEventsMarkup(agent: Agent) {
+    if (!agent.events.length) return `<div class="empty-events">${t("noEvents")}</div>`;
+    return [...agent.events].reverse().map(event => this.agentEventMarkup(event)).join("");
+  }
+
+  private agentEventMarkup(event: AgentEvent) {
+    const time = formatEventTime(event.minute);
+    if (event.type === "healthCritical") {
+      return `
+        <article class="agent-event health-critical">
+          <div class="agent-event-time">${time}</div>
+          <strong>${t("event.healthCritical")}</strong>
+          <div>${t("event.criticalNutrient")}: ${t(`phys.${event.nutrient}`)} · ${(event.ratio * 100).toFixed(0)}%</div>
+        </article>`;
+    }
+
+    return `
+      <article class="agent-event">
+        <div class="agent-event-time">${time}</div>
+        <strong>${t("event.jobChange")}</strong>
+        <div>${t("from")} ${t(`job.${event.previousJob}`)} → ${t(`job.${event.newJob}`)}</div>
+        <div>${t("event.previousIncome")}: ${formatValue(event.previousIncome)} 🪙</div>
+        <div>${t("event.expectedIncome")}: ${formatValue(event.expectedIncome)} 🪙</div>
+      </article>`;
+  }
   private renderLegend(history: Metrics[]) {
     const root = this.ui.querySelector<HTMLDivElement>("#line-legend");
     if (!root) return;
@@ -486,6 +536,10 @@ function formatChartTime(history: Metrics[], index: number): string {
   }
 }
 
+function formatEventTime(minute: number): string {
+  const parts = simulationTimeParts(minute);
+  return `${t("day")} ${parts.day} · ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
 function niceAxis(minValue: number, maxValue: number, ticks = 5) {
   if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
     return { min: 0, max: 1, step: 0.2 };
