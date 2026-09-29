@@ -101,12 +101,10 @@
   "agentProfile": "Profil",
   "agentHistory": "Historique",
   "noEvents": "Aucun événement enregistré.",
-  "event": {
-    "healthCritical": "Santé critique",
-    "criticalNutrient": "Réserve critique",
-    "jobChange": "Changement de métier",
-    "previousIncome": "Revenu du métier précédent",
-    "expectedIncome": "Perspective de revenu"
-  },
-  "from": "de"
+  "from": "de",
+  "event.healthCritical": "Santé critique",
+  "event.criticalNutrient": "Réserve critique",
+  "event.jobChange": "Changement de métier",
+  "event.previousIncome": "Revenu du métier précédent",
+  "event.expectedIncome": "Perspective de revenu"
 }
