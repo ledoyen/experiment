@@ -95,5 +95,18 @@
   "phys.selenium": "Sélénium",
   "livingPopulation": "Individus vivants",
   "month": "mois",
-  "year": "année"
+  "year": "année",
+  "populationByJob": "Effectifs par métier",
+  "close": "Fermer",
+  "agentProfile": "Profil",
+  "agentHistory": "Historique",
+  "noEvents": "Aucun événement enregistré.",
+  "event": {
+    "healthCritical": "Santé critique",
+    "criticalNutrient": "Réserve critique",
+    "jobChange": "Changement de métier",
+    "previousIncome": "Revenu du métier précédent",
+    "expectedIncome": "Perspective de revenu"
+  },
+  "from": "de"
 }
