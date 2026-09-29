@@ -95,5 +95,18 @@
   "phys.selenium": "Selenium",
   "livingPopulation": "Living individuals",
   "month": "month",
-  "year": "year"
+  "year": "year",
+  "populationByJob": "Population by job",
+  "close": "Close",
+  "agentProfile": "Profile",
+  "agentHistory": "History",
+  "noEvents": "No recorded events.",
+  "event": {
+    "healthCritical": "Critical health",
+    "criticalNutrient": "Critical reserve",
+    "jobChange": "Job change",
+    "previousIncome": "Previous job income",
+    "expectedIncome": "Expected income"
+  },
+  "from": "from"
 }
