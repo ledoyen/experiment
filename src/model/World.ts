@@ -6,6 +6,8 @@ import {
   careerReviewDelayMinutes,
   heatingConsumptionForDay,
   heatingPurchaseNeed,
+  dailyMaintenanceNeed,
+  MAINTENANCE_GOODS,
   priceMultiplier,
   seasonalProductionMultiplier,
   shouldSwitchJob,
@@ -135,7 +137,7 @@ export class World {
           INITIAL_RESERVE_MIN_RATIO + Math.random() * (1 - INITIAL_RESERVE_MIN_RATIO),
           metabolicFactor
         ),
-        heatingStock: 1,
+        heatingStock: 0,
         inventory: {},
         events: [],
         nextJobReviewMinute: careerReviewDelayMinutes(Math.random())
@@ -483,12 +485,41 @@ export class World {
       );
     }
 
+    const maintenanceDemand = {} as Record<"vetement" | "outil", number>;
+    const maintenanceSaleFraction = {} as Record<"vetement" | "outil", number>;
+
+    for (const good of MAINTENANCE_GOODS) {
+      maintenanceDemand[good] =
+        dailyMaintenanceNeed(good) * this.agents.length;
+
+      const supply = marketSupply[good] ?? 0;
+      maintenanceSaleFraction[good] =
+        maintenanceDemand[good] > 0
+          ? Math.min(1, supply / maintenanceDemand[good])
+          : 0;
+    }
+
+    for (const agent of this.agents) {
+      for (const good of MAINTENANCE_GOODS) {
+        const desired = dailyMaintenanceNeed(good);
+        const affordable = agent.money / Math.max(this.prices[good], 1e-9);
+        const quantity = Math.min(
+          desired * maintenanceSaleFraction[good],
+          affordable
+        );
+        agent.money -= quantity * this.prices[good];
+      }
+    }
+
     // Money from each commodity sale goes to the people who owned the stock.
-    for (const good of [...FOOD_GOODS, "chauffage" as Good]) {
+    for (const good of [...FOOD_GOODS, "chauffage" as Good, ...MAINTENANCE_GOODS]) {
       const soldQuantity =
-        (good === "chauffage"
+        good === "chauffage"
           ? totalHeatingDemand * heatingSaleFraction
-          : foodDemand[good] * saleFraction[good]);
+          : (MAINTENANCE_GOODS.includes(good as "vetement" | "outil")
+            ? maintenanceDemand[good as "vetement" | "outil"] *
+              maintenanceSaleFraction[good as "vetement" | "outil"]
+            : foodDemand[good] * saleFraction[good]);
 
       if (soldQuantity <= 0) continue;
 
@@ -508,11 +539,13 @@ export class World {
     }
 
     // A price changes at most once in this daily market clearing.
-    for (const good of [...FOOD_GOODS, "chauffage" as Good]) {
+    for (const good of [...FOOD_GOODS, "chauffage" as Good, ...MAINTENANCE_GOODS]) {
       const demand =
         good === "chauffage"
           ? totalHeatingDemand
-          : foodDemand[good];
+          : (MAINTENANCE_GOODS.includes(good as "vetement" | "outil")
+            ? maintenanceDemand[good as "vetement" | "outil"]
+            : foodDemand[good]);
 
       const availableSupply = marketSupply[good] ?? 0;
       const referenceSupply =
@@ -551,7 +584,9 @@ export class World {
       const demand =
         good === "chauffage"
           ? totalHeatingDemand
-          : foodDemand[good] ?? 0;
+          : (MAINTENANCE_GOODS.includes(good as "vetement" | "outil")
+            ? maintenanceDemand[good as "vetement" | "outil"]
+            : foodDemand[good] ?? 0);
 
       const currentSupply =
         marketSupply[good] ?? 0;
