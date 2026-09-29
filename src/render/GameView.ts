@@ -10,6 +10,8 @@ export class GameView {
   private dragging = false;
   private origin = { x: 0, y: 0, camX: 0, camY: 0 };
   private agentHoverHandler: ((agent: Agent | null, screenX: number, screenY: number) => void) | null = null;
+  private agentClickHandler: ((agent: Agent | null) => void) | null = null;
+  private pointerDown = { x: 0, y: 0, moved: false, agent: null as Agent | null };
 
   constructor(root: HTMLElement, private readonly world: World) {
     this.canvas = document.createElement("canvas");
@@ -21,6 +23,10 @@ export class GameView {
 
   setAgentHoverHandler(handler: (agent: Agent | null, screenX: number, screenY: number) => void) {
     this.agentHoverHandler = handler;
+  }
+
+  setAgentClickHandler(handler: (agent: Agent | null) => void) {
+    this.agentClickHandler = handler;
   }
 
   render() {
@@ -108,7 +114,18 @@ export class GameView {
     window.addEventListener("resize", () => this.render());
 
     this.canvas.addEventListener("pointerdown", event => {
+      const rect = this.canvas.getBoundingClientRect();
+      const worldX = this.camX + (event.clientX - rect.left - rect.width / 2) / this.zoom;
+      const worldY = this.camY + (event.clientY - rect.top - rect.height / 2) / this.zoom;
+      const agent = this.world.getAgentAtWorldPosition(worldX, worldY, 12 / this.zoom);
+
       this.dragging = true;
+      this.pointerDown = {
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+        agent
+      };
       this.origin = {
         x: event.clientX,
         y: event.clientY,
@@ -120,23 +137,41 @@ export class GameView {
 
     this.canvas.addEventListener("pointermove", event => {
       if (this.dragging) {
-        this.camX = this.origin.camX - (event.clientX - this.origin.x) / this.zoom;
-        this.camY = this.origin.camY - (event.clientY - this.origin.y) / this.zoom;
+        const dx = event.clientX - this.origin.x;
+        const dy = event.clientY - this.origin.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.pointerDown.moved = true;
+        this.camX = this.origin.camX - dx / this.zoom;
+        this.camY = this.origin.camY - dy / this.zoom;
       }
 
       const rect = this.canvas.getBoundingClientRect();
       const worldX = this.camX + (event.clientX - rect.left - rect.width / 2) / this.zoom;
       const worldY = this.camY + (event.clientY - rect.top - rect.height / 2) / this.zoom;
       const agent = this.world.getAgentAtWorldPosition(worldX, worldY, 12 / this.zoom);
+      this.canvas.style.cursor = agent
+        ? (this.dragging ? "grabbing" : "pointer")
+        : (this.dragging ? "grabbing" : "default");
       this.agentHoverHandler?.(agent, event.clientX, event.clientY);
     });
 
     this.canvas.addEventListener("pointerleave", event => {
+      if (!this.dragging) this.canvas.style.cursor = "default";
       this.agentHoverHandler?.(null, event.clientX, event.clientY);
     });
 
     this.canvas.addEventListener("pointerup", event => {
+      const rect = this.canvas.getBoundingClientRect();
+      const worldX = this.camX + (event.clientX - rect.left - rect.width / 2) / this.zoom;
+      const worldY = this.camY + (event.clientY - rect.top - rect.height / 2) / this.zoom;
+      const agent = this.world.getAgentAtWorldPosition(worldX, worldY, 12 / this.zoom);
+
       this.dragging = false;
+      this.canvas.style.cursor = agent ? "pointer" : "default";
+
+      if (!this.pointerDown.moved && this.pointerDown.agent && agent?.id === this.pointerDown.agent.id) {
+        this.agentClickHandler?.(agent);
+      }
+
       this.canvas.releasePointerCapture(event.pointerId);
     });
 
