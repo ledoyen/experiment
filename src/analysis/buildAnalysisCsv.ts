@@ -1,7 +1,6 @@
 import type { Good, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import { GOODS, GOOD_PRICE_UNIT } from "../data/economy";
 import { simulationTimeParts } from "../data/glossary";
-import type { I18nKey } from "../i18n";
 import { t } from "../i18n";
 
 export interface AnalysisSeries {
@@ -69,7 +68,7 @@ function eventTimeLabel(minute: number): string {
 }
 
 function parameterLabel(parameter: keyof Parameters): string {
-  return t(parameter as I18nKey);
+  return t(parameter);
 }
 
 function seriesFromHistory(history: Metrics[]): AnalysisSeries[] {
