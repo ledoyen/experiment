@@ -171,6 +171,7 @@ export class AppUi {
           ${this.range("priceSensitivity", "priceSensitivity", 0, 1, this.world.parameters.priceSensitivity, .05)}
           ${this.range("productivityVariance", "productivityVariance", 0, .5, this.world.parameters.productivityVariance, .01)}
           <label class="switch"><input id="money" type="checkbox"> ${t("money")}</label>
+          <button id="export-analysis">${t("exportAnalysis")}</button>
           <button id="restart">${t("restart")}</button>
         </div>
       </aside>
@@ -208,6 +209,10 @@ export class AppUi {
   private bind() {
     this.ui.querySelector("#drawer-toggle")?.addEventListener("click", () => {
       this.ui.querySelector(".drawer")?.classList.toggle("open");
+    });
+
+    this.ui.querySelector("#export-analysis")?.addEventListener("click", () => {
+      this.exportAnalysisCsv();
     });
 
     this.ui.querySelector("#restart")?.addEventListener("click", () => {
@@ -467,6 +472,24 @@ export class AppUi {
         <div>${t("event.previousIncome")}: ${formatValue(event.previousIncome)} 🪙</div>
         <div>${t("event.expectedIncome")}: ${formatValue(event.expectedIncome)} 🪙</div>
       </article>`;
+  }
+  private exportAnalysisCsv() {
+    const csv = buildAnalysisCsv(
+      this.world.getHistory(),
+      this.world.getInitialParameters(),
+      this.world.parameters,
+      this.world.getParameterEvents()
+    );
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const day = Math.floor(this.world.minute / 1440) + 1;
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `economic-godgame-day-${day}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }
   private renderLegend(history: Metrics[]) {
     const root = this.ui.querySelector<HTMLDivElement>("#line-legend");
