@@ -19,6 +19,13 @@ export interface Parameters {
 
 import type { NutritionId, NutritionReserves } from "./nutrition";
 
+export interface ParameterChangeEvent {
+  minute: number;
+  parameter: keyof Parameters;
+  previousValue: Parameters[keyof Parameters];
+  newValue: Parameters[keyof Parameters];
+}
+
 export type AgentEvent =
   | {
       minute: number;
