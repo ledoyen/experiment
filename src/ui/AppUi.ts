@@ -5,6 +5,7 @@ import { chartTimeResolution, simulationTimeParts } from "../data/glossary";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
+import { buildAnalysisCsv } from "../analysis/buildAnalysisCsv";
 
 type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population";
 type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}`;
