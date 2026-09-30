@@ -1,6 +1,6 @@
 import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
-import type { Agent, Good, Job, Metrics, Parameters } from "../data/types";
+import type { Agent, Good, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
   careerReviewDelayMinutes,
@@ -54,12 +54,22 @@ export class World {
   parameters: Parameters;
 
   private readonly history: Metrics[] = [];
-  private readonly snapshots: Array<{ minute: number; prices: Record<Good, number>; agents: Agent[]; monetaryReserve: number }> = [];
+  private readonly snapshots: Array<{
+    minute: number;
+    prices: Record<Good, number>;
+    agents: Agent[];
+    monetaryReserve: number;
+    parameters: Parameters;
+    parameterEvents: ParameterChangeEvent[];
+  }> = [];
+  private readonly parameterEvents: ParameterChangeEvent[] = [];
+  private runInitialParameters: Parameters;
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
 
   constructor(parameters: Parameters) {
     this.parameters = structuredClone(parameters);
+    this.runInitialParameters = structuredClone(parameters);
     this.reset();
   }
 
@@ -70,6 +80,8 @@ export class World {
     this.monetaryReserve = 0;
     this.history.length = 0;
     this.snapshots.length = 0;
+    this.parameterEvents.length = 0;
+    this.runInitialParameters = structuredClone(this.parameters);
 
     const referenceCounts = new Map<Job, number>();
     const allocations: Array<{
@@ -149,7 +161,22 @@ export class World {
   }
 
   setParameters(patch: Partial<Parameters>) {
-    this.parameters = { ...this.parameters, ...patch };
+    const next = { ...this.parameters, ...patch };
+
+    for (const parameter of Object.keys(patch) as Array<keyof Parameters>) {
+      const previousValue = this.parameters[parameter];
+      const newValue = next[parameter];
+      if (Object.is(previousValue, newValue)) continue;
+
+      this.parameterEvents.push({
+        minute: this.minute,
+        parameter,
+        previousValue,
+        newValue
+      });
+    }
+
+    this.parameters = next;
   }
 
   step(minutes = 1, captureInterval = 10) {
@@ -173,6 +200,12 @@ export class World {
     this.prices = { ...snapshot.prices };
     this.agents = structuredClone(snapshot.agents);
     this.monetaryReserve = snapshot.monetaryReserve;
+    this.parameters = structuredClone(snapshot.parameters);
+    this.parameterEvents.splice(
+      0,
+      this.parameterEvents.length,
+      ...structuredClone(snapshot.parameterEvents)
+    );
     while (this.history.length && this.history[this.history.length - 1].minute > this.minute) this.history.pop();
   }
 
@@ -224,6 +257,14 @@ export class World {
     return [...(this.agents.find(agent => agent.id === agentId)?.events ?? [])];
   }
 
+  getParameterEvents() {
+    return structuredClone(this.parameterEvents);
+  }
+
+  getInitialParameters() {
+    return structuredClone(this.runInitialParameters);
+  }
+
   getJobCounts(): Record<Job, number> {
     const counts = {} as Record<Job, number>;
     for (const activity of ACTIVITIES) counts[activity.job] = 0;
@@ -254,7 +295,9 @@ export class World {
       minute: this.minute,
       prices: { ...this.prices },
       agents: structuredClone(this.agents),
-      monetaryReserve: this.monetaryReserve
+      monetaryReserve: this.monetaryReserve,
+      parameters: structuredClone(this.parameters),
+      parameterEvents: structuredClone(this.parameterEvents)
     });
     this.compactSnapshots();
   }
