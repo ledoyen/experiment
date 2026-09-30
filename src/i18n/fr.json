@@ -106,5 +106,6 @@
   "event.criticalNutrient": "Réserve critique",
   "event.jobChange": "Changement de métier",
   "event.previousIncome": "Revenu du métier précédent",
-  "event.expectedIncome": "Perspective de revenu"
+  "event.expectedIncome": "Perspective de revenu",
+  "exportAnalysis": "Exporter les données d'analyse"
 }
