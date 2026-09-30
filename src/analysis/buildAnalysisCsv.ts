@@ -68,7 +68,15 @@ function eventTimeLabel(minute: number): string {
 }
 
 function parameterLabel(parameter: keyof Parameters): string {
-  return t(parameter);
+  const labels: Record<keyof Parameters, string> = {
+    population: "population",
+    initialMoney: "initialMoneyPerIndividual",
+    moneyEnabled: "money",
+    mobility: "mobility",
+    priceSensitivity: "priceSensitivity",
+    productivityVariance: "productivityVariance"
+  };
+  return t(labels[parameter]);
 }
 
 function seriesFromHistory(history: Metrics[]): AnalysisSeries[] {
@@ -133,7 +141,7 @@ function parameterComments(
     lines.push("# Evenements de parametres");
     for (const event of events) {
       lines.push(
-        `# event | ${eventTimeLabel(event.minute)} | ${parameterLabel(event.parameter)} | ${String(event.previousValue)} -> ${String(event.newValue)}`
+        `# event | ${eventTimeLabel(event.minute)} | ${String(event.parameter)} (${parameterLabel(event.parameter)}) | ${String(event.previousValue)} -> ${String(event.newValue)}`
       );
     }
   } else {
