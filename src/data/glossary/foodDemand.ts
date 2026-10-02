@@ -1,13 +1,28 @@
 /**
  * DEMANDE ALIMENTAIRE — glossaire
  *
- * Individuals do not have a fixed food basket.
- * They first protect short-horizon survival needs, then balance macronutrients,
- * then restore micronutrient reserves.
+ * A Human does not choose a fixed basket. They evaluate actual market offers:
+ * each seller can expose the same good at a different price and stock.
+ *
+ * This function is pure: it only returns the purchases the Human would try
+ * to make. The transaction layer applies those purchases to inventories and money.
  */
 
-import { FOOD_NUTRITION, NUTRITION, foodToNutrition, targetFor, type NutritionReserves } from "../nutrition";
-import type { Good, PhysiologyState, Sex } from "../types";
+import {
+  FOOD_NUTRITION,
+  NUTRITION,
+  foodToNutrition,
+  targetFor,
+  type NutritionReserves
+} from "../nutrition";
+import type {
+  AvailableGood,
+  Good,
+  Human,
+  PhysiologyState,
+  PurchaseDecision,
+  Sex
+} from "../types";
 
 export const MAX_FOOD_PURCHASE_ROUNDS = 256;
 
@@ -15,8 +30,9 @@ export const FOOD_PRIORITY_TIERS = [
   ["energy"] as const,
   ["protein", "carbohydrate", "fat", "fiber"] as const,
   [
-    "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3", "vitamin_B6",
-    "vitamin_B9", "vitamin_B12", "vitamin_C", "vitamin_E", "vitamin_K",
+    "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3",
+    "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C",
+    "vitamin_E", "vitamin_K",
     "calcium", "iron", "magnesium", "zinc", "iodine", "selenium"
   ] as const
 ];
@@ -34,40 +50,28 @@ function dailyIntakeNeed(
   return Math.max(target, reserve.max - reserve.value);
 }
 
-function tierNeeds(
-  reserves: NutritionReserves,
-  sex: Sex,
-  state: PhysiologyState,
-  requirementFactor: number
-) {
+function initialNeeds(human: Human) {
   return Object.fromEntries(
     NUTRITION.map(nutrient => [
       nutrient.id,
       dailyIntakeNeed(
         nutrient,
-        reserves[nutrient.id],
-        sex,
-        state,
-        requirementFactor
+        human.reserves[nutrient.id],
+        human.sex,
+        human.state,
+        human.metabolicFactor
       )
     ])
   ) as Record<(typeof NUTRITION)[number]["id"], number>;
 }
 
-export function planFoodDemand(
-  reserves: NutritionReserves,
-  sex: Sex,
-  state: PhysiologyState,
-  availableMoney: number,
-  prices: Partial<Record<Good, number>>,
-  allocationCaps?: Partial<Record<Good, number>>,
-  requirementFactor = 1
-): Record<Good, number> {
-  const demand = {} as Record<Good, number>;
-  for (const good of Object.keys(FOOD_NUTRITION) as Good[]) demand[good] = 0;
-
-  let moneyLeft = Math.max(0, availableMoney);
-  const needs = tierNeeds(reserves, sex, state, requirementFactor);
+export function decidePurchases(
+  human: Human,
+  market: readonly AvailableGood[]
+): PurchaseDecision[] {
+  const decisions: PurchaseDecision[] = [];
+  const needs = initialNeeds(human);
+  let moneyLeft = Math.max(0, human.money);
 
   for (const tier of FOOD_PRIORITY_TIERS) {
     for (
@@ -75,19 +79,26 @@ export function planFoodDemand(
       round < MAX_FOOD_PURCHASE_ROUNDS && moneyLeft > 1e-9;
       round++
     ) {
-      let bestGood: Good | null = null;
+      if (!tier.some(nutrientId => needs[nutrientId as TierId] > 1e-9)) {
+        break;
+      }
+
+      let bestOffer: AvailableGood | null = null;
       let bestQuantity = 0;
       let bestScore = 0;
 
-      const tierHasNeed = tier.some(
-        nutrientId => needs[nutrientId as TierId] > 1e-9
-      );
-      if (!tierHasNeed) break;
+      for (const offer of market) {
+        if (
+          offer.sellerId === human.id ||
+          offer.stock <= 1e-12 ||
+          !Number.isFinite(offer.price) ||
+          offer.price <= 0
+        ) {
+          continue;
+        }
 
-      for (const good of Object.keys(FOOD_NUTRITION) as Good[]) {
-        const price = prices[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || !Number.isFinite(price) || price <= 0) continue;
+        const food = FOOD_NUTRITION[offer.name];
+        if (!food) continue;
 
         const contribution = foodToNutrition(food, 1);
         let benefit = 0;
@@ -98,14 +109,23 @@ export function planFoodDemand(
           if (need <= 1e-9) continue;
 
           const supplied = contribution[nutrientId] ?? 0;
-          if (supplied > 0) {
-            const nutrient = NUTRITION.find(item => item.id === nutrientId);
-            if (!nutrient) continue;
+          if (supplied <= 0) continue;
 
-            benefit += Math.min(need, supplied) /
-              Math.max(1e-9, targetFor(nutrient, sex, state) * requirementFactor);
-            maxUsefulQuantity = Math.min(maxUsefulQuantity, need / supplied);
-          }
+          const nutrient = NUTRITION.find(item => item.id === nutrientId);
+          if (!nutrient) continue;
+
+          benefit +=
+            Math.min(need, supplied) /
+            Math.max(
+              1e-9,
+              targetFor(nutrient, human.sex, human.state) *
+                human.metabolicFactor
+            );
+
+          maxUsefulQuantity = Math.min(
+            maxUsefulQuantity,
+            need / supplied
+          );
         }
 
         if (
@@ -116,45 +136,101 @@ export function planFoodDemand(
           continue;
         }
 
-        const physicalLimit =
-          allocationCaps?.[good] === undefined
-            ? Number.POSITIVE_INFINITY
-            : Math.max(0, allocationCaps[good]! - (demand[good] ?? 0));
-
         const quantity = Math.min(
           maxUsefulQuantity,
-          moneyLeft / price,
-          physicalLimit
+          offer.stock,
+          moneyLeft / offer.price
         );
-        const score = quantity > 0 ? benefit / price : 0;
 
+        const score = quantity > 0 ? benefit / offer.price : 0;
         if (score > bestScore) {
           bestScore = score;
-          bestGood = good;
+          bestOffer = offer;
           bestQuantity = quantity;
         }
       }
 
-      if (!bestGood || bestQuantity <= 0) break;
+      if (!bestOffer || bestQuantity <= 0) break;
 
-      const price = prices[bestGood] ?? 0;
-      demand[bestGood] += bestQuantity;
-      moneyLeft -= bestQuantity * price;
+      decisions.push({
+        name: bestOffer.name,
+        sellerId: bestOffer.sellerId,
+        price: bestOffer.price,
+        quantity: bestQuantity
+      });
+
+      moneyLeft -= bestQuantity * bestOffer.price;
 
       const contribution = foodToNutrition(
-        FOOD_NUTRITION[bestGood]!,
+        FOOD_NUTRITION[bestOffer.name]!,
         bestQuantity
       );
 
       for (const nutrientId of tier) {
         needs[nutrientId as TierId] = Math.max(
           0,
-          needs[nutrientId as TierId] - (contribution[nutrientId] ?? 0)
+          needs[nutrientId as TierId] -
+            (contribution[nutrientId] ?? 0)
         );
       }
     }
 
     if (moneyLeft <= 1e-9) break;
+  }
+
+  return decisions;
+}
+
+/**
+ * Compatibility helper for calibration code.
+ * It deliberately uses one synthetic seller per good.
+ */
+export function planFoodDemand(
+  reserves: NutritionReserves,
+  sex: Sex,
+  state: PhysiologyState,
+  availableMoney: number,
+  prices: Partial<Record<Good, number>>,
+  allocationCaps?: Partial<Record<Good, number>>,
+  requirementFactor = 1
+): Record<Good, number> {
+  const human: Human = {
+    id: -1,
+    x: 0,
+    y: 0,
+    job: "idle",
+    productivity: 1,
+    reserves,
+    sex,
+    state,
+    metabolicFactor: requirementFactor,
+    money: availableMoney,
+    inventory: {},
+    forSale: {},
+    askPrices: {}
+  } as Human;
+
+  const market: AvailableGood[] = Object.keys(FOOD_NUTRITION)
+    .map(name => {
+      const good = name as Good;
+      const price = prices[good] ?? 0;
+      return {
+        name: good,
+        sellerId: -100,
+        price,
+        stock:
+          allocationCaps?.[good] === undefined
+            ? Number.POSITIVE_INFINITY
+            : Math.max(0, allocationCaps[good]!)
+      };
+    })
+    .filter(offer => Number.isFinite(offer.price) && offer.price > 0);
+
+  const decisions = decidePurchases(human, market);
+  const demand = {} as Record<Good, number>;
+  for (const decision of decisions) {
+    demand[decision.name] =
+      (demand[decision.name] ?? 0) + decision.quantity;
   }
 
   return demand;
