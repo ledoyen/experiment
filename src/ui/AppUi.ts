@@ -8,7 +8,7 @@ import { GameView } from "../render/GameView";
 import { buildAnalysisCsv } from "../analysis/buildAnalysisCsv";
 
 type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population";
-type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}`;
+type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}` | `stock:${Good}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
 const SERIES_COLORS: Record<string, string> = {
@@ -34,12 +34,17 @@ function seriesColor(key: SeriesKey): string {
     return PRICE_COLORS[index % PRICE_COLORS.length];
   }
   if (key.startsWith("job:")) return JOB_SERIES_COLORS[key.slice(4) as Job];
+  if (key.startsWith("stock:")) {
+    const index = GOODS.indexOf(key.slice(6) as Good);
+    return PRICE_COLORS[(index + 5) % PRICE_COLORS.length];
+  }
   return SERIES_COLORS[key];
 }
 
 function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key.startsWith("price:")) return point.prices[key.slice(6) as Good];
   if (key.startsWith("job:")) return point.jobCounts[key.slice(4) as Job] ?? 0;
+  if (key.startsWith("stock:")) return point.stocks[key.slice(6) as Good] ?? 0;
   return Number(point[key as BaseSeriesKey]);
 }
 
@@ -50,6 +55,7 @@ function seriesLabel(key: SeriesKey): string {
       " (" + PRICE_CURRENCY_SYMBOL + " / " + GOOD_PRICE_UNIT[good] + ")";
   }
   if (key.startsWith("job:")) return t("job." + key.slice(4));
+  if (key.startsWith("stock:")) return t("stock") + " — " + t("good." + key.slice(6));
   return t(key);
 }
 
@@ -134,6 +140,12 @@ export class AppUi {
           <summary>${t("populationByJob")}</summary>
           <div class="choices">
             ${Object.keys(JOB_SERIES_COLORS).filter(job => job !== "idle").map(job => this.check(("job:" + job) as SeriesKey, "job." + job)).join("")}
+          </div>
+        </details>
+        <details class="price-choices">
+          <summary>${t("stock")}</summary>
+          <div class="choices">
+            ${CONSUMED_GOODS.map(good => this.check(("stock:" + good) as SeriesKey, "good." + good)).join("")}
           </div>
         </details>
 
