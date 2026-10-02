@@ -123,3 +123,50 @@ export function findHuman(
 ): Human | undefined {
   return humans.find(human => human.id === id);
 }
+
+
+export function decideCheapestPurchases(
+  human: Human,
+  market: readonly AvailableGood[],
+  name: Good,
+  desiredQuantity: number
+): PurchaseDecision[] {
+  let remaining = Math.max(0, desiredQuantity);
+  let moneyLeft = Math.max(0, human.money);
+  const decisions: PurchaseDecision[] = [];
+
+  const offers = market
+    .filter(
+      offer =>
+        offer.name === name &&
+        offer.sellerId !== human.id &&
+        offer.stock > 1e-12 &&
+        Number.isFinite(offer.price) &&
+        offer.price > 0
+    )
+    .sort((a, b) => a.price - b.price);
+
+  for (const offer of offers) {
+    if (remaining <= 1e-12 || moneyLeft <= 1e-12) break;
+
+    const quantity = Math.min(
+      remaining,
+      offer.stock,
+      moneyLeft / offer.price
+    );
+
+    if (quantity <= 1e-12) continue;
+
+    decisions.push({
+      name: offer.name,
+      sellerId: offer.sellerId,
+      price: offer.price,
+      quantity
+    });
+
+    remaining -= quantity;
+    moneyLeft -= quantity * offer.price;
+  }
+
+  return decisions;
+}
