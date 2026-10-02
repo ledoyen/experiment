@@ -54,7 +54,7 @@ export interface Agent {
 
 export interface Metrics {
   minute: number; population: number; medianWealth: number; gini: number; foodPrice: number;
-  moneySupply: number; prices: Record<Good, number>;
+  moneySupply: number; prices: Record<Good, number>; stocks: Record<Good, number>;
   wealthBins: number[];
   wealthBinSums: number[];
   wealthBinEdges: number[];
