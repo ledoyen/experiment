@@ -42,15 +42,49 @@ export type AgentEvent =
       expectedIncome: number;
     };
 
-export interface Agent {
-  id: number; x: number; y: number; job: Job; productivity: number; money: number;
-  sex: Sex; physiologyState: PhysiologyState; nutrition: NutritionReserves;
+export type HumanId = number;
+
+export interface AvailableGood {
+  name: Good;
+  sellerId: HumanId;
+  price: number;
+  stock: number;
+}
+
+export interface PurchaseDecision {
+  name: Good;
+  sellerId: HumanId;
+  price: number;
+  quantity: number;
+}
+
+export interface Human {
+  id: HumanId;
+  x: number;
+  y: number;
+  job: Job;
+  productivity: number;
+
+  // An individual's complete economic/physiological state.
+  reserves: NutritionReserves;
+  sex: Sex;
+  state: PhysiologyState;
   metabolicFactor: number;
-  heatingStock: number;
+  money: number;
+
+  // Physical ownership is the source of truth. forSale is only the
+  // quantity currently exposed to the market.
   inventory: Partial<Record<Good, number>>;
+  forSale: Partial<Record<Good, number>>;
+  askPrices: Partial<Record<Good, number>>;
+
   events: AgentEvent[];
   nextJobReviewMinute: number;
 }
+
+// Kept temporarily as a compatibility alias for rendering/UI code.
+export type Agent = Human;
+
 
 export interface Metrics {
   minute: number; population: number; medianWealth: number; gini: number; foodPrice: number;
