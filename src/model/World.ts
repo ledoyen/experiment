@@ -216,6 +216,7 @@ export class World {
     const productivityDistribution = linearDistributionBins(productivity);
     const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
     const jobCounts = this.getJobCounts();
+    const stocks = this.getStockTotals();
 
     return {
       minute: this.minute,
@@ -227,6 +228,7 @@ export class World {
         ? wealthTotal + this.monetaryReserve
         : 0,
       prices: { ...this.prices },
+      stocks,
       wealthBins: wealthDistribution.counts,
       wealthBinSums: wealthDistribution.sums,
       wealthBinEdges: wealthDistribution.edges,
@@ -271,6 +273,22 @@ export class World {
     counts.idle = 0;
     for (const agent of this.agents) counts[agent.job]++;
     return counts;
+  }
+
+  getStockTotals(): Record<Good, number> {
+    const stocks = {} as Record<Good, number>;
+    for (const good of Object.keys(this.prices) as Good[]) {
+      stocks[good] = 0;
+    }
+
+    for (const agent of this.agents) {
+      for (const good of Object.keys(this.prices) as Good[]) {
+        stocks[good] += Math.max(0, agent.inventory[good] ?? 0);
+      }
+      stocks.chauffage += Math.max(0, agent.heatingStock);
+    }
+
+    return stocks;
   }
 
   color(job: Job) { return jobColors[job]; }
