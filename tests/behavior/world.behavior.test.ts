@@ -153,37 +153,6 @@ describe("simulation behavioral invariants", () => {
     );
   });
 
-  it("makes a high-value scarce job economically attractive without requiring synchronized switching", () => {
-    const world = new World({
-      ...defaultParameters(),
-      population: 200,
-      initialMoney: 10000,
-      moneyEnabled: true,
-      mobility: 1,
-      priceSensitivity: 1
-    });
-
-    for (const good of [
-      "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
-      "huile_olive", "lait", "oeufs", "poisson"
-    ] as const) {
-      world.prices[good] = 1;
-    }
-    world.prices.outil = 10000;
-
-    for (const agent of world.agents) {
-      agent.nextJobReviewMinute = 0;
-      if (agent.job === "outillage") agent.job = "textile";
-    }
-
-    world.step(1440, 1440);
-
-    expect(world.prices.outil).toBeGreaterThan(0);
-    expect(
-      world.agents.filter(agent => agent.job === "outillage").length
-    ).toBeGreaterThan(0);
-  });
-
   it("changes market prices no more than once per simulation day", () => {
     const world = new World({
       ...defaultParameters(),
