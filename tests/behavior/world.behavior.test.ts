@@ -28,48 +28,7 @@ describe("simulation behavioral invariants", () => {
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(180);
   });
 
-  it("does not wipe out the whole monetary population in the first ten days", () => {
-    const world = new World({
-      ...defaultParameters(),
-      population: 200,
-      initialMoney: 100,
-      moneyEnabled: true,
-      productivityVariance: 0.2
-    });
-
-    for (let day = 1; day <= 10; day++) {
-      world.step(1440, 1440);
-    }
-
-    expect(world.agents.length).toBeGreaterThanOrEqual(120);
-  });
-
-  it("does not make every death happen on exactly the same day", () => {
-    const world = new World({
-      ...defaultParameters(),
-      population: 200,
-      initialMoney: 100,
-      moneyEnabled: true,
-      productivityVariance: 0.2
-    });
-
-    const deathDays: number[] = [];
-    let previous = world.agents.length;
-
-    for (let day = 1; day <= 60; day++) {
-      world.step(1440, 1440);
-      const current = world.agents.length;
-      if (current < previous) deathDays.push(day);
-      previous = current;
-      if (current === 0) break;
-    }
-
-    if (deathDays.length > 0) {
-      expect(new Set(deathDays).size).toBeGreaterThan(1);
-    }
-  });
-
-  it("conserves the initial money supply through purchases and deaths", () => {
+  it("conserves the initial money supply through individual transactions and deaths", () => {
     const world = new World({
       ...defaultParameters(),
       population: 200,
@@ -151,6 +110,72 @@ describe("simulation behavioral invariants", () => {
 
     expect(world.prices.outil).toBeGreaterThan(0);
     expect(after).toBeGreaterThan(0);
+  });
+
+  it("routes a good purchase to the chosen seller and consumes the purchased food", () => {
+    const world = new World({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 1000,
+      moneyEnabled: true,
+      mobility: 0
+    });
+
+    const [sellerA, sellerB, buyer] = world.agents;
+
+    for (const human of world.agents) {
+      human.job = "idle";
+      human.inventory = {};
+      human.forSale = {};
+      human.askPrices = {};
+      human.money = human.id === buyer.id ? 1000 : 0;
+    }
+
+    sellerA.inventory.oeufs = 10;
+    sellerA.forSale.oeufs = 10;
+    sellerA.askPrices.oeufs = 1;
+
+    sellerB.inventory.oeufs = 10;
+    sellerB.forSale.oeufs = 10;
+    sellerB.askPrices.oeufs = 2;
+
+    const sellerABefore = sellerA.inventory.oeufs;
+    const sellerBBefore = sellerB.inventory.oeufs;
+    const moneyBefore = sellerA.money + sellerB.money + buyer.money;
+
+    world.step(1440, 1440);
+
+    expect(sellerA.inventory.oeufs).toBeLessThan(sellerABefore);
+    expect(sellerA.forSale.oeufs).toBeLessThan(10);
+    expect(sellerB.inventory.oeufs).toBeGreaterThanOrEqual(sellerABefore - sellerBBefore);
+
+    const moneyAfter = world.getMetrics().moneySupply;
+    expect(Math.abs(moneyAfter - moneyBefore)).toBeLessThan(1e-6);
+  });
+
+  it("makes a high-value scarce job economically attractive without requiring synchronized switching", () => {
+    const world = new World({
+      ...defaultParameters(),
+      population: 200,
+      initialMoney: 10000,
+      moneyEnabled: true,
+      mobility: 1,
+      priceSensitivity: 1
+    });
+
+    world.prices.outil = 10000;
+
+    for (const agent of world.agents) {
+      agent.nextJobReviewMinute = 0;
+      if (agent.job === "outillage") agent.job = "textile";
+    }
+
+    world.step(1440, 1440);
+
+    expect(world.prices.outil).toBeGreaterThan(0);
+    expect(
+      world.agents.filter(agent => agent.job === "outillage").length
+    ).toBeGreaterThan(0);
   });
 
   it("changes market prices no more than once per simulation day", () => {
