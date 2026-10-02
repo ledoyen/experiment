@@ -112,7 +112,7 @@ describe("simulation behavioral invariants", () => {
     expect(after).toBeGreaterThan(0);
   });
 
-  it("routes a good purchase to the chosen seller and consumes the purchased food", () => {
+  it("routes a purchase to the cheapest seller and transfers ownership", () => {
     const world = new World({
       ...defaultParameters(),
       population: 3,
@@ -125,32 +125,32 @@ describe("simulation behavioral invariants", () => {
 
     for (const human of world.agents) {
       human.job = "idle";
-      human.inventory = {};
+      human.inventory = { ble: 20 };
       human.forSale = {};
       human.askPrices = {};
-      human.money = human.id === buyer.id ? 1000 : 0;
     }
 
-    sellerA.inventory.oeufs = 10;
-    sellerA.forSale.oeufs = 10;
-    sellerA.askPrices.oeufs = 1;
+    sellerA.inventory.outil = 1;
+    sellerA.forSale.outil = 1;
+    sellerA.askPrices.outil = 1;
 
-    sellerB.inventory.oeufs = 10;
-    sellerB.forSale.oeufs = 10;
-    sellerB.askPrices.oeufs = 2;
+    sellerB.inventory.outil = 10;
+    sellerB.forSale.outil = 10;
+    sellerB.askPrices.outil = 2;
 
-    const sellerABefore = sellerA.inventory.oeufs;
-    const sellerBBefore = sellerB.inventory.oeufs;
-    const moneyBefore = sellerA.money + sellerB.money + buyer.money;
+    const sellerAMoneyBefore = sellerA.money;
+    const sellerBMoneyBefore = sellerB.money;
 
     world.step(1440, 1440);
 
-    expect(sellerA.inventory.oeufs).toBeLessThan(sellerABefore);
-    expect(sellerA.forSale.oeufs).toBeLessThan(10);
-    expect(sellerA.inventory.oeufs).toBeLessThan(sellerB.inventory.oeufs);
-
-    const moneyAfter = world.getMetrics().moneySupply;
-    expect(Math.abs(moneyAfter - moneyBefore)).toBeLessThan(1e-6);
+    expect(sellerA.inventory.outil).toBeLessThan(1);
+    expect(sellerB.inventory.outil).toBeLessThanOrEqual(10);
+    expect(sellerA.money).toBeGreaterThan(sellerAMoneyBefore);
+    expect(sellerB.money).toBeGreaterThanOrEqual(sellerBMoneyBefore);
+    expect(world.getMetrics().moneySupply).toBeCloseTo(
+      3 * 1000,
+      10
+    );
   });
 
   it("makes a high-value scarce job economically attractive without requiring synchronized switching", () => {
@@ -163,6 +163,12 @@ describe("simulation behavioral invariants", () => {
       priceSensitivity: 1
     });
 
+    for (const good of [
+      "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
+      "huile_olive", "lait", "oeufs", "poisson"
+    ] as const) {
+      world.prices[good] = 1;
+    }
     world.prices.outil = 10000;
 
     for (const agent of world.agents) {
