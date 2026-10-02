@@ -6,7 +6,7 @@
  */
 
 import type { AvailableGood, Good, Human, HumanId } from "../data/types";
-import { PRICE_MIN } from "../data/glossary";
+import { PRICE_MIN } from "../data/glossary/market";
 
 export function buildAvailableGoods(
   humans: readonly Human[],
