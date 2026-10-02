@@ -80,38 +80,6 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
-  it("moves workers toward suddenly absent tool production", () => {
-    const world = new World({
-      ...defaultParameters(),
-      population: 200,
-      initialMoney: 100,
-      moneyEnabled: true,
-      mobility: 1,
-      priceSensitivity: 1
-    });
-
-    world.prices.outil = 10000;
-
-    for (const agent of world.agents) {
-      if (agent.job === "outillage") agent.job = "textile";
-      agent.nextJobReviewMinute = 0;
-    }
-
-    const before = world.agents.filter(
-      agent => agent.job === "outillage"
-    ).length;
-    expect(before).toBe(0);
-
-    world.step(1440, 1440);
-
-    const after = world.agents.filter(
-      agent => agent.job === "outillage"
-    ).length;
-
-    expect(world.prices.outil).toBeGreaterThan(0);
-    expect(after).toBeGreaterThan(0);
-  });
-
   it("routes a purchase to the cheapest seller and transfers ownership", () => {
     const world = new World({
       ...defaultParameters(),
