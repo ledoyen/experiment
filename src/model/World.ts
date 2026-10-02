@@ -1,6 +1,6 @@
 import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
-import type { Agent, Good, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
+import type { Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
   careerReviewDelayMinutes,
@@ -19,6 +19,7 @@ import {
   planFoodDemand,
   MAX_STORED_FOOD_DAYS_FOR_PRICE
 } from "../data/glossary";
+import { buildAvailableGoods, executePurchase, listForSale } from "./market";
 
 const activityJobs = ACTIVITIES.map(activity => activity.job);
 
@@ -50,14 +51,14 @@ export class World {
   readonly height = 1100;
   minute = 0;
   prices: Record<Good, number> = { ...INITIAL_PRICE };
-  agents: Agent[] = [];
+  agents: Human[] = [];
   parameters: Parameters;
 
   private readonly history: Metrics[] = [];
   private readonly snapshots: Array<{
     minute: number;
     prices: Record<Good, number>;
-    agents: Agent[];
+    agents: Human[];
     monetaryReserve: number;
     parameters: Parameters;
     parameterEvents: ParameterChangeEvent[];
@@ -150,8 +151,9 @@ export class World {
           INITIAL_RESERVE_MIN_RATIO + Math.random() * (1 - INITIAL_RESERVE_MIN_RATIO),
           metabolicFactor
         ),
-        heatingStock: 0,
         inventory: {},
+        forSale: {},
+        askPrices: {},
         events: [],
         nextJobReviewMinute: careerReviewDelayMinutes(Math.random())
       };
@@ -285,7 +287,6 @@ export class World {
       for (const good of Object.keys(this.prices) as Good[]) {
         stocks[good] += Math.max(0, agent.inventory[good] ?? 0);
       }
-      stocks.chauffage += Math.max(0, agent.heatingStock);
     }
 
     return stocks;
@@ -356,9 +357,9 @@ export class World {
       const heatingConsumption = heatingConsumptionForDay(simulationDay);
 
       for (const agent of this.agents) {
-        agent.heatingStock = Math.max(
+        agent.inventory.chauffage = Math.max(
           0,
-          agent.heatingStock - heatingConsumption
+          agent.inventory.chauffage - heatingConsumption
         );
       }
 
@@ -423,9 +424,9 @@ export class World {
 
     const foodPlans = this.agents.map(agent =>
       planFoodDemand(
-        agent.nutrition,
+        agent.reserves,
         agent.sex,
-        agent.physiologyState,
+        agent.state,
         agent.money,
         prices,
         undefined,
@@ -490,18 +491,18 @@ export class World {
         }
       }
 
-      const previousNutrition = agent.nutrition;
-      agent.nutrition = applyNutritionDay(
-        agent.nutrition,
+      const previousNutrition = agent.reserves;
+      agent.reserves = applyNutritionDay(
+        agent.reserves,
         intake,
         agent.sex,
-        agent.physiologyState,
+        agent.state,
         agent.metabolicFactor
       );
 
       const critical = descendingIntoCritical(
         previousNutrition,
-        agent.nutrition
+        agent.reserves
       );
       if (critical) {
         agent.events.push({
@@ -518,7 +519,7 @@ export class World {
     const heatingDemand = this.agents.map((agent, index) => {
       const desired = heatingPurchaseNeed(
         simulationDay,
-        agent.heatingStock
+        agent.inventory.chauffage
       );
       if (desired <= 0) return 0;
 
@@ -669,7 +670,7 @@ export class World {
         (sum, good) => sum + (foodPlans[index][good] ?? 0) * prices[good],
         0
       );
-      const energyReserve = agent.nutrition.energy;
+      const energyReserve = agent.reserves.energy;
       const energyRatio =
         energyReserve.max > 0 ? energyReserve.value / energyReserve.max : 0;
       const urgentReview = careerReviewIsUrgent(
@@ -746,9 +747,9 @@ export class World {
 
     const plans = this.agents.map(agent =>
       planFoodDemand(
-        agent.nutrition,
+        agent.reserves,
         agent.sex,
-        agent.physiologyState,
+        agent.state,
         Number.MAX_SAFE_INTEGER,
         equalPrices,
         perCapitaSupply,
@@ -788,18 +789,18 @@ export class World {
         // owners' stocks proportionally after the allocation below.
       }
 
-      const previousNutrition = agent.nutrition;
-      agent.nutrition = applyNutritionDay(
+      const previousNutrition = agent.reserves;
+      agent.reserves = applyNutritionDay(
         previousNutrition,
         intake,
         agent.sex,
-        agent.physiologyState,
+        agent.state,
         agent.metabolicFactor
       );
 
       const critical = descendingIntoCritical(
         previousNutrition,
-        agent.nutrition
+        agent.reserves
       );
       if (critical) {
         agent.events.push({
@@ -837,10 +838,10 @@ export class World {
   }
 
   private removeDeadAgents() {
-    const survivors: Agent[] = [];
+    const survivors: Human[] = [];
 
     for (const agent of this.agents) {
-      if (isLethalNutritionState(agent.nutrition)) {
+      if (isLethalNutritionState(agent.reserves)) {
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
