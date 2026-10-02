@@ -107,5 +107,6 @@
   "event.jobChange": "Changement de métier",
   "event.previousIncome": "Revenu du métier précédent",
   "event.expectedIncome": "Perspective de revenu",
-  "exportAnalysis": "Exporter les données d'analyse"
+  "exportAnalysis": "Exporter les données d'analyse",
+  "stock": "Stock"
 }
