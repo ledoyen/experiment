@@ -17,6 +17,7 @@ import {
   exponentialDistributionBins,
   linearDistributionBins,
   planFoodDemand,
+  decidePurchases,
   MAX_STORED_FOOD_DAYS_FOR_PRICE
 } from "../data/glossary";
 import { buildAvailableGoods, decideCheapestPurchases, executePurchase, listForSale } from "./market";
