@@ -147,7 +147,7 @@ describe("simulation behavioral invariants", () => {
 
     expect(sellerA.inventory.oeufs).toBeLessThan(sellerABefore);
     expect(sellerA.forSale.oeufs).toBeLessThan(10);
-    expect(sellerB.inventory.oeufs).toBeGreaterThanOrEqual(sellerABefore - sellerBBefore);
+    expect(sellerA.inventory.oeufs).toBeLessThan(sellerB.inventory.oeufs);
 
     const moneyAfter = world.getMetrics().moneySupply;
     expect(Math.abs(moneyAfter - moneyBefore)).toBeLessThan(1e-6);
