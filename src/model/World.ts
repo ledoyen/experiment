@@ -426,7 +426,86 @@ export class World {
     );
   }
 
+  private consumeStoredFood(agent: Human, simulationDay: number) {
+    const equalPrices = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, 1])
+    ) as Partial<Record<Good, number>>;
+
+    const ownedFood = Object.fromEntries(
+      FOOD_GOODS.map(good => [
+        good,
+        Math.max(0, agent.inventory[good] ?? 0)
+      ])
+    ) as Partial<Record<Good, number>>;
+
+    const quantities = planFoodDemand(
+      agent.reserves,
+      agent.sex,
+      agent.state,
+      Number.POSITIVE_INFINITY,
+      equalPrices,
+      ownedFood,
+      agent.metabolicFactor
+    );
+
+    const intake = {} as Partial<Record<NutritionId, number>>;
+    for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
+
+    for (const good of FOOD_GOODS) {
+      const quantity = quantities[good] ?? 0;
+      if (quantity <= 0) continue;
+
+      const food = FOOD_NUTRITION[good];
+      if (!food) continue;
+
+      const contribution = foodToNutrition(food, quantity);
+      for (const nutrient of NUTRITION) {
+        intake[nutrient.id] =
+          (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
+      }
+
+      agent.inventory[good] = Math.max(
+        0,
+        (agent.inventory[good] ?? 0) - quantity
+      );
+
+      // Consumed stock can no longer remain listed for sale.
+      agent.forSale[good] = Math.max(
+        0,
+        (agent.forSale[good] ?? 0) - quantity
+      );
+    }
+
+    if (Object.values(intake).every(value => (value ?? 0) <= 0)) return;
+
+    const previousReserves = agent.reserves;
+    agent.reserves = applyNutritionDay(
+      agent.reserves,
+      intake,
+      agent.sex,
+      agent.state,
+      agent.metabolicFactor
+    );
+
+    const critical = descendingIntoCritical(
+      previousReserves,
+      agent.reserves
+    );
+    if (critical) {
+      agent.events.push({
+        minute: simulationDay * 1440,
+        type: "healthCritical",
+        nutrient: critical.nutrient,
+        ratio: critical.ratio
+      });
+    }
+  }
+
   private processMarketDay(simulationDay: number) {
+    for (const agent of this.agents) {
+      this.consumeStoredFood(agent, simulationDay);
+    }
+
     const prices = { ...this.prices };
 
     // The market is a list of individual offers. The same good may therefore
