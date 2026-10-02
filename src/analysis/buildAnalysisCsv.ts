@@ -111,6 +111,12 @@ function seriesFromHistory(history: Metrics[]): AnalysisSeries[] {
       unit: `🪙 / ${GOOD_PRICE_UNIT[good]}`,
       values: history.map(point => point.prices[good])
     })),
+    ...GOODS.map((good: Good): AnalysisSeries => ({
+      id: `stock:${good}`,
+      label: `${t("stock")} — ${t(`good.${good}`)}`,
+      unit: GOOD_PRICE_UNIT[good],
+      values: history.map(point => point.stocks[good] ?? 0)
+    })),
     ...JOBS.map((job): AnalysisSeries => ({
       id: `job:${job}`,
       label: t(`job.${job}`),
