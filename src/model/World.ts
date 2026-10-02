@@ -459,138 +459,22 @@ export class World {
       }
     }
 
-    // Buyers are processed in a random order: the market is sequential,
-    // without an artificial "everyone changes/shops simultaneously" rule.
+    // Food is cleared in rounds. Buyers submit requests against individual
+    // offers, then an oversubscribed offer is rationed proportionally rather
+    // than being exhausted by whichever Human happened to be processed first.
     const buyers = [...this.agents].sort(() => Math.random() - 0.5);
-    const foodPurchasedByHuman = new Map<number, Partial<Record<Good, number>>>();
     const tradeVolume = {} as Record<Good, number>;
     const tradeValue = {} as Record<Good, number>;
 
-    for (const buyer of buyers) {
-      const foodDecisions = decidePurchases(buyer, offers);
-
-      for (const decision of foodDecisions) {
-        const seller = this.agents.find(human => human.id === decision.sellerId);
-        if (!seller) continue;
-
-        const executed = executePurchase(
-          buyer,
-          seller,
-          offers.find(
-            offer =>
-              offer.name === decision.name &&
-              offer.sellerId === decision.sellerId &&
-              Math.abs(offer.price - decision.price) < 1e-12
-          ) ?? {
-            name: decision.name,
-            sellerId: decision.sellerId,
-            price: decision.price,
-            stock: decision.quantity
-          },
-          decision.quantity
-        );
-
-        if (executed <= 0) continue;
-
-        const purchases = foodPurchasedByHuman.get(buyer.id) ?? {};
-        purchases[decision.name] =
-          (purchases[decision.name] ?? 0) + executed;
-        foodPurchasedByHuman.set(buyer.id, purchases);
-
-        tradeVolume[decision.name] =
-          (tradeVolume[decision.name] ?? 0) + executed;
-        tradeValue[decision.name] =
-          (tradeValue[decision.name] ?? 0) + executed * decision.price;
-      }
-
-      // Heating has a stock target and is bought from the cheapest offers.
-      const desiredHeating = heatingPurchaseNeed(
-        simulationDay,
-        buyer.inventory.chauffage ?? 0
-      );
-
-      if (desiredHeating > 0) {
-        const heatingDecisions = decideCheapestPurchases(
-          buyer,
-          offers,
-          "chauffage",
-          desiredHeating
-        );
-
-        for (const decision of heatingDecisions) {
-          const seller = this.agents.find(human => human.id === decision.sellerId);
-          if (!seller) continue;
-
-          const offer = offers.find(
-            candidate =>
-              candidate.name === decision.name &&
-              candidate.sellerId === decision.sellerId &&
-              Math.abs(candidate.price - decision.price) < 1e-12
-          );
-          if (!offer) continue;
-
-          const executed = executePurchase(
-            buyer,
-            seller,
-            offer,
-            decision.quantity
-          );
-
-          if (executed <= 0) continue;
-
-          tradeVolume[decision.name] =
-            (tradeVolume[decision.name] ?? 0) + executed;
-          tradeValue[decision.name] =
-            (tradeValue[decision.name] ?? 0) + executed * decision.price;
-        }
-      }
-
-      // Clothing and tools are ordinary durable-good purchases for now.
-      for (const good of MAINTENANCE_GOODS) {
-        const decisions = decideCheapestPurchases(
-          buyer,
-          offers,
-          good,
-          dailyMaintenanceNeed(good)
-        );
-
-        for (const decision of decisions) {
-          const seller = this.agents.find(human => human.id === decision.sellerId);
-          if (!seller) continue;
-
-          const offer = offers.find(
-            candidate =>
-              candidate.name === decision.name &&
-              candidate.sellerId === decision.sellerId &&
-              Math.abs(candidate.price - decision.price) < 1e-12
-          );
-          if (!offer) continue;
-
-          const executed = executePurchase(
-            buyer,
-            seller,
-            offer,
-            decision.quantity
-          );
-
-          if (executed <= 0) continue;
-
-          tradeVolume[decision.name] =
-            (tradeVolume[decision.name] ?? 0) + executed;
-          tradeValue[decision.name] =
-            (tradeValue[decision.name] ?? 0) + executed * decision.price;
-        }
-      }
-    }
-
-    // Consume only food actually purchased by the human today.
-    for (const agent of this.agents) {
-      const purchases = foodPurchasedByHuman.get(agent.id) ?? {};
+    const applyPurchasedFood = (
+      human: Human,
+      purchased: Partial<Record<Good, number>>
+    ) => {
       const intake = {} as Partial<Record<NutritionId, number>>;
       for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
 
       for (const good of FOOD_GOODS) {
-        const quantity = purchases[good] ?? 0;
+        const quantity = purchased[good] ?? 0;
         if (quantity <= 0) continue;
 
         const food = FOOD_NUTRITION[good];
@@ -602,33 +486,196 @@ export class World {
             (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
         }
 
-        // Food bought for consumption is removed from the buyer's inventory.
-        agent.inventory[good] = Math.max(
+        human.inventory[good] = Math.max(
           0,
-          (agent.inventory[good] ?? 0) - quantity
+          (human.inventory[good] ?? 0) - quantity
         );
       }
 
-      const previousNutrition = agent.reserves;
-      agent.reserves = applyNutritionDay(
-        agent.reserves,
+      if (Object.values(intake).every(value => (value ?? 0) <= 0)) return;
+
+      const previousReserves = human.reserves;
+      human.reserves = applyNutritionDay(
+        human.reserves,
         intake,
-        agent.sex,
-        agent.state,
-        agent.metabolicFactor
+        human.sex,
+        human.state,
+        human.metabolicFactor
       );
 
       const critical = descendingIntoCritical(
-        previousNutrition,
-        agent.reserves
+        previousReserves,
+        human.reserves
       );
       if (critical) {
-        agent.events.push({
+        human.events.push({
           minute: simulationDay * 1440,
           type: "healthCritical",
           nutrient: critical.nutrient,
           ratio: critical.ratio
         });
+      }
+    };
+
+    for (let round = 0; round < 8; round++) {
+      const requestsByHuman = new Map<
+        number,
+        ReturnType<typeof decidePurchases>
+      >();
+      const requestsByOffer = new Map<AvailableGood, Array<{
+        human: Human;
+        decision: ReturnType<typeof decidePurchases>[number];
+      }>>();
+
+      let anyRequest = false;
+
+      for (const buyer of buyers) {
+        const decisions = decidePurchases(buyer, offers);
+        if (decisions.length > 0) anyRequest = true;
+        requestsByHuman.set(buyer.id, decisions);
+
+        for (const decision of decisions) {
+          const offer = offers.find(
+            candidate =>
+              candidate.name === decision.name &&
+              candidate.sellerId === decision.sellerId &&
+              Math.abs(candidate.price - decision.price) < 1e-12 &&
+              candidate.stock > 1e-12
+          );
+          if (!offer) continue;
+
+          const requests = requestsByOffer.get(offer) ?? [];
+          requests.push({ human: buyer, decision });
+          requestsByOffer.set(offer, requests);
+        }
+      }
+
+      if (!anyRequest) break;
+
+      let anyTrade = false;
+
+      for (const [offer, requests] of requestsByOffer) {
+        const totalRequested = requests.reduce(
+          (sum, item) => sum + item.decision.quantity,
+          0
+        );
+        if (totalRequested <= 1e-12 || offer.stock <= 1e-12) continue;
+
+        const rationing = Math.min(1, offer.stock / totalRequested);
+
+        for (const request of requests) {
+          const seller = this.agents.find(
+            human => human.id === offer.sellerId
+          );
+          if (!seller) continue;
+
+          const executed = executePurchase(
+            request.human,
+            seller,
+            offer,
+            request.decision.quantity * rationing
+          );
+
+          if (executed <= 0) continue;
+
+          anyTrade = true;
+          tradeVolume[offer.name] =
+            (tradeVolume[offer.name] ?? 0) + executed;
+          tradeValue[offer.name] =
+            (tradeValue[offer.name] ?? 0) +
+            executed * offer.price;
+
+          const purchased = {} as Partial<Record<Good, number>>;
+          purchased[offer.name] = executed;
+          applyPurchasedFood(request.human, purchased);
+        }
+      }
+
+      if (!anyTrade) break;
+    }
+
+    // Heating has a physical stock target and is bought from the cheapest
+    // individual offers after food has been settled.
+    for (const buyer of buyers) {
+      const desiredHeating = heatingPurchaseNeed(
+        simulationDay,
+        buyer.inventory.chauffage ?? 0
+      );
+
+      if (desiredHeating <= 0) continue;
+
+      const heatingDecisions = decideCheapestPurchases(
+        buyer,
+        offers,
+        "chauffage",
+        desiredHeating
+      );
+
+      for (const decision of heatingDecisions) {
+        const seller = this.agents.find(
+          human => human.id === decision.sellerId
+        );
+        const offer = offers.find(
+          candidate =>
+            candidate.name === decision.name &&
+            candidate.sellerId === decision.sellerId &&
+            Math.abs(candidate.price - decision.price) < 1e-12
+        );
+
+        if (!seller || !offer) continue;
+
+        const executed = executePurchase(
+          buyer,
+          seller,
+          offer,
+          decision.quantity
+        );
+
+        if (executed <= 0) continue;
+
+        tradeVolume[decision.name] =
+          (tradeVolume[decision.name] ?? 0) + executed;
+        tradeValue[decision.name] =
+          (tradeValue[decision.name] ?? 0) +
+          executed * decision.price;
+      }
+
+      for (const good of MAINTENANCE_GOODS) {
+        const decisions = decideCheapestPurchases(
+          buyer,
+          offers,
+          good,
+          dailyMaintenanceNeed(good)
+        );
+
+        for (const decision of decisions) {
+          const seller = this.agents.find(
+            human => human.id === decision.sellerId
+          );
+          const offer = offers.find(
+            candidate =>
+              candidate.name === decision.name &&
+              candidate.sellerId === decision.sellerId &&
+              Math.abs(candidate.price - decision.price) < 1e-12
+          );
+
+          if (!seller || !offer) continue;
+
+          const executed = executePurchase(
+            buyer,
+            seller,
+            offer,
+            decision.quantity
+          );
+
+          if (executed <= 0) continue;
+
+          tradeVolume[decision.name] =
+            (tradeVolume[decision.name] ?? 0) + executed;
+          tradeValue[decision.name] =
+            (tradeValue[decision.name] ?? 0) +
+            executed * decision.price;
+        }
       }
     }
 
