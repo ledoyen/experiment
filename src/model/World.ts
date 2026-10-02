@@ -294,9 +294,9 @@ export class World {
 
   color(job: Job) { return jobColors[job]; }
 
-  getAgentAtWorldPosition(x: number, y: number, radius: number): Agent | null {
+  getAgentAtWorldPosition(x: number, y: number, radius: number): Human | null {
     const radiusSquared = radius * radius;
-    let nearest: Agent | null = null;
+    let nearest: Human | null = null;
     let nearestDistance = radiusSquared;
     for (const agent of this.agents) {
       const dx = agent.x - x;
