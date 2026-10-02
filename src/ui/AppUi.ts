@@ -394,7 +394,7 @@ export class AppUi {
     const topRows = `
       <div class="agent-tooltip-title">#${agent.id}</div>
       <div class="agent-row"><span>${t("sex")}</span><strong>${t(`sex.${agent.sex}`)}</strong></div>
-      <div class="agent-row"><span>${t("physiologyState")}</span><strong>${t(`physiology.${agent.physiologyState}`)}</strong></div>
+      <div class="agent-row"><span>${t("physiologyState")}</span><strong>${t(`physiology.${agent.state}`)}</strong></div>
       <div class="agent-row"><span>${t("job")}</span><strong>${t(`job.${agent.job}`)}</strong></div>
       <div class="agent-row"><span>${t("productivity")}</span><strong>${formatValue(agent.productivity)}</strong></div>
       <div class="agent-row"><span>${t("money")}</span><strong>${formatValue(agent.money)}</strong></div>
@@ -420,7 +420,7 @@ export class AppUi {
 
   private nutritionGaugeMarkup(agent: Agent, ids: NutritionId[]) {
     return ids.map(id => {
-      const reserve = agent.nutrition[id];
+      const reserve = agent.reserves[id];
       const percent = reserve.max > 0 ? Math.max(0, Math.min(100, reserve.value / reserve.max * 100)) : 0;
       return `
         <div class="phys-gauge">
