@@ -24,7 +24,7 @@ import type {
   Sex
 } from "../types";
 
-export const MAX_FOOD_PURCHASE_ROUNDS = 64;
+export const MAX_FOOD_PURCHASE_ROUNDS = 16;
 
 export const FOOD_PRIORITY_TIERS = [
   ["energy"] as const,
