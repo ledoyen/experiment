@@ -177,9 +177,37 @@ export class World {
         previousValue,
         newValue
       });
+
+      if (
+        parameter === "moneyEnabled" &&
+        previousValue === false &&
+        newValue === true
+      ) {
+        this.exposeExistingInventoryToMarket();
+      }
     }
 
     this.parameters = next;
+  }
+
+  private exposeExistingInventoryToMarket() {
+    // Introducing money must not make pre-existing physical stocks
+    // inaccessible. Every Human may therefore expose their currently owned
+    // inventory; their own daily consumption will reduce both inventory and
+    // listed quantity before the market clears.
+    for (const human of this.agents) {
+      for (const good of Object.keys(human.inventory) as Good[]) {
+        const stock = Math.max(0, human.inventory[good] ?? 0);
+        if (stock <= 1e-12) continue;
+
+        listForSale(
+          human,
+          good,
+          stock,
+          this.prices[good]
+        );
+      }
+    }
   }
 
   step(minutes = 1, captureInterval = 10) {
