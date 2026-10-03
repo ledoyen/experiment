@@ -80,6 +80,45 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
+  it("makes pre-money food stocks available when money is introduced", () => {
+    const world = new World({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 100,
+      moneyEnabled: false,
+      mobility: 0
+    });
+
+    const [seller, buyer, other] = world.agents;
+
+    for (const human of world.agents) {
+      human.job = "idle";
+      human.inventory = {};
+      human.forSale = {};
+      human.askPrices = {};
+    }
+
+    seller.inventory.ble = 100;
+    seller.money = 0;
+    buyer.money = 1000;
+    other.money = 0;
+
+    const sellerMoneyBefore = seller.money;
+    world.setParameters({ moneyEnabled: true });
+
+    expect(seller.forSale.ble).toBe(100);
+
+    world.step(1440, 1440);
+
+    expect(seller.inventory.ble).toBeLessThan(100);
+    expect(seller.money).toBeGreaterThan(sellerMoneyBefore);
+    expect(
+      buyer.inventory.ble +
+      (other.inventory.ble ?? 0) +
+      seller.inventory.ble
+    ).toBeLessThan(100);
+  });
+
   it("routes a purchase to the cheapest seller and transfers ownership", () => {
     const world = new World({
       ...defaultParameters(),
