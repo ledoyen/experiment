@@ -59,7 +59,7 @@ export const NUTRITION: NutritionDefinition[] = [
   { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, target: { male: 58.1, female: 58.1 } },
   { id: "carbohydrate", labelKey: "phys.carbohydrate", unit: "g", maxDays: 7, target: { male: 328.1, female: 262.5 } },
   { id: "fat", labelKey: "phys.fat", unit: "g", maxDays: 7, target: { male: 76.4, female: 61.1 } },
-  { id: "fiber", labelKey: "phys.fiber", unit: "g", maxDays: 2, target: { male: 25, female: 25 } },
+  { id: "fiber", labelKey: "phys.fiber", unit: "g", maxDays: 7, target: { male: 25, female: 25 } },
   { id: "vitamin_A", labelKey: "phys.vitamin_A", unit: "µg RE", maxDays: 30, target: { male: 750, female: 650 } },
   { id: "vitamin_B1", labelKey: "phys.vitamin_B1", unit: "mg", maxDays: 30, target: { male: 1.1, female: 0.9 } },
   { id: "vitamin_B2", labelKey: "phys.vitamin_B2", unit: "mg", maxDays: 30, target: { male: 1.6, female: 1.4 } },
