@@ -574,54 +574,55 @@ export class World {
     const tradeVolume = {} as Record<Good, number>;
     const tradeValue = {} as Record<Good, number>;
 
-    const applyPurchasedFood = (
+    const purchasedIntake = new Map<number, Partial<Record<NutritionId, number>>>();
+
+    const recordPurchasedFood = (
       human: Human,
-      purchased: Partial<Record<Good, number>>
+      good: Good,
+      quantity: number
     ) => {
-      const intake = {} as Partial<Record<NutritionId, number>>;
-      for (const nutrient of NUTRITION) intake[nutrient.id] = 0;
+      if (quantity <= 0) return;
+      const food = FOOD_NUTRITION[good];
+      if (!food) return;
 
-      for (const good of FOOD_GOODS) {
-        const quantity = purchased[good] ?? 0;
-        if (quantity <= 0) continue;
+      const intake = purchasedIntake.get(human.id) ??
+        ({} as Partial<Record<NutritionId, number>>);
+      const contribution = foodToNutrition(food, quantity);
 
-        const food = FOOD_NUTRITION[good];
-        if (!food) continue;
-
-        const contribution = foodToNutrition(food, quantity);
-        for (const nutrient of NUTRITION) {
-          intake[nutrient.id] =
-            (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
-        }
-
-        human.inventory[good] = Math.max(
-          0,
-          (human.inventory[good] ?? 0) - quantity
-        );
+      for (const nutrient of NUTRITION) {
+        intake[nutrient.id] =
+          (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
       }
 
-      if (Object.values(intake).every(value => (value ?? 0) <= 0)) return;
+      purchasedIntake.set(human.id, intake);
+    };
 
-      const previousReserves = human.reserves;
-      human.reserves = applyNutritionDay(
-        human.reserves,
-        intake,
-        human.sex,
-        human.state,
-        human.metabolicFactor
-      );
+    const applyPurchasedNutrition = () => {
+      for (const buyer of this.agents) {
+        const intake = purchasedIntake.get(buyer.id);
+        if (!intake) continue;
 
-      const critical = descendingIntoCritical(
-        previousReserves,
-        human.reserves
-      );
-      if (critical) {
-        human.events.push({
-          minute: simulationDay * 1440,
-          type: "healthCritical",
-          nutrient: critical.nutrient,
-          ratio: critical.ratio
-        });
+        const previousReserves = buyer.reserves;
+        buyer.reserves = applyNutritionDay(
+          buyer.reserves,
+          intake,
+          buyer.sex,
+          buyer.state,
+          buyer.metabolicFactor
+        );
+
+        const critical = descendingIntoCritical(
+          previousReserves,
+          buyer.reserves
+        );
+        if (critical) {
+          buyer.events.push({
+            minute: simulationDay * 1440,
+            type: "healthCritical",
+            nutrient: critical.nutrient,
+            ratio: critical.ratio
+          });
+        }
       }
     };
 
@@ -693,14 +694,18 @@ export class World {
             (tradeValue[offer.name] ?? 0) +
             executed * offer.price;
 
-          const purchased = {} as Partial<Record<Good, number>>;
-          purchased[offer.name] = executed;
-          applyPurchasedFood(request.human, purchased);
+          recordPurchasedFood(
+            request.human,
+            offer.name,
+            executed
+          );
         }
       }
 
       if (!anyTrade) break;
     }
+
+    applyPurchasedNutrition();
 
     // Heating has a physical stock target and is bought from the cheapest
     // individual offers after food has been settled.
