@@ -55,7 +55,7 @@ export const INITIAL_RESERVE_MIN_RATIO = 0.90;
 export const INDIVIDUAL_REQUIREMENT_VARIANCE = 0.10;
 
 export const NUTRITION: NutritionDefinition[] = [
-  { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 2, target: { male: 2500, female: 2000 } },
+  { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 7, target: { male: 2500, female: 2000 } },
   { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, target: { male: 58.1, female: 58.1 } },
   { id: "carbohydrate", labelKey: "phys.carbohydrate", unit: "g", maxDays: 7, target: { male: 328.1, female: 262.5 } },
   { id: "fat", labelKey: "phys.fat", unit: "g", maxDays: 7, target: { male: 76.4, female: 61.1 } },
