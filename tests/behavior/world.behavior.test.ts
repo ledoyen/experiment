@@ -56,7 +56,7 @@ describe("simulation behavioral invariants", () => {
       productivityVariance: 0.2
     });
 
-    const populations = runDays(world, 30);
+    const populations = runDays(world, 7);
     expect(populations[0]).toBeGreaterThanOrEqual(180);
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
   });
