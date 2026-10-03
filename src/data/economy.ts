@@ -69,8 +69,13 @@ export const ACTIVE_REFERENCE_ETP = ACTIVITIES
   .filter(activity => !activity.dormant && activity.referenceEtp > 0)
   .reduce((sum, activity) => sum + activity.referenceEtp, 0);
 
+export const FOOD_PRODUCTION_CALIBRATION = 5;
+
 export function dailyOutputPerEtp(activity: ActivityDefinition): number {
-  return activity.annualOutputFor1000 / activity.referenceEtp / 365;
+  const base = activity.annualOutputFor1000 / activity.referenceEtp / 365;
+  return FOOD_GOODS.includes(activity.output)
+    ? base * FOOD_PRODUCTION_CALIBRATION
+    : base;
 }
 
 export function activityByJob(job: Job): ActivityDefinition | undefined {
