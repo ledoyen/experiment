@@ -47,6 +47,20 @@ describe("simulation behavioral invariants", () => {
     }
   });
 
+  it("keeps a monetary population viable through the first month", () => {
+    const world = new World({
+      ...defaultParameters(),
+      population: 200,
+      initialMoney: 100,
+      moneyEnabled: true,
+      productivityVariance: 0.2
+    });
+
+    const populations = runDays(world, 30);
+    expect(populations[0]).toBeGreaterThanOrEqual(180);
+    expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
+  });
+
   it("keeps prices and population metrics finite", () => {
     const world = new World({
       ...defaultParameters(),
