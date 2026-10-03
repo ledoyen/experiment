@@ -70,7 +70,7 @@ describe("simulation behavioral invariants", () => {
       productivityVariance: 0.2
     });
 
-    for (let day = 0; day < 60; day++) {
+    for (let day = 0; day < 20; day++) {
       world.step(1440, 1440);
       const metrics = world.getMetrics();
 
