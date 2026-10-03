@@ -624,7 +624,7 @@ export class World {
       }
     };
 
-    for (let round = 0; round < 8; round++) {
+    for (let round = 0; round < MAX_FOOD_PURCHASE_ROUNDS; round++) {
       const requestsByHuman = new Map<
         number,
         ReturnType<typeof decidePurchases>
