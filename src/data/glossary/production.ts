@@ -16,6 +16,7 @@ export const SEASON_ORDER: Season[] = ["winter", "spring", "summer", "autumn"];
 
 type SeasonalProfile = Record<Season, number>;
 
+// Seasonal factors are normalized around an annual average of 1. They represent timing of work/output, not an increase in annual yield. Crop seasonality is inherent to preindustrial agriculture; historical yields also varied strongly with weather. Source: https://www.bahs.org.uk/crop-yields-database/the-data/
 export const PRODUCTION_SEASONALITY: Partial<Record<Job, SeasonalProfile>> = {
   agriculture_ble: {
     winter: 0.8, spring: 0.8, summer: 1.4, autumn: 1.0
@@ -58,6 +59,7 @@ export const PRODUCTION_SEASONALITY: Partial<Record<Job, SeasonalProfile>> = {
   }
 };
 
+// A value of 1 means no seasonal effect when an activity has no specific profile.
 const DEFAULT_PROFILE: SeasonalProfile = {
   winter: 1,
   spring: 1,
@@ -65,6 +67,7 @@ const DEFAULT_PROFILE: SeasonalProfile = {
   autumn: 1
 };
 
+// Pure lookup of the seasonal factor for a job and simulation day.
 export function seasonalProductionMultiplier(
   job: Job,
   simulationDay: number
