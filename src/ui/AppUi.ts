@@ -47,6 +47,8 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key.startsWith("price:")) return point.prices[key.slice(6) as Good];
   if (key.startsWith("job:")) return point.jobCounts[key.slice(4) as Job] ?? 0;
   if (key.startsWith("stock:")) return point.stocks[key.slice(6) as Good] ?? 0;
+  if (key === "physicalWealth") return point.physicalWealth;
+  if (key === "zeroMoneyWithoutFood") return point.zeroMoneyWithoutFoodCount;
   return Number(point[key as BaseSeriesKey]);
 }
 
