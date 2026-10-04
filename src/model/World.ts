@@ -250,6 +250,13 @@ export class World {
     const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
     const jobCounts = this.getJobCounts();
     const stocks = this.getStockTotals();
+    const zeroMoney = this.agents.filter(agent => agent.money <= 1e-9);
+    const zeroMoneyWithFood = zeroMoney.filter(agent =>
+      FOOD_GOODS.some(good => (agent.inventory[good] ?? 0) > 1e-9)
+    );
+    const physicalWealth = this.agents.reduce((sum, agent) =>
+      sum + Object.values(agent.inventory).reduce((total, quantity) => total + Math.max(0, quantity ?? 0), 0), 0
+    );
 
     return {
       minute: this.minute,
@@ -268,6 +275,10 @@ export class World {
       wealthTotal,
       wealthMin: wealth.length ? Math.min(...wealth) : 0,
       wealthMax: wealth.length ? Math.max(...wealth) : 0,
+      zeroMoneyCount: zeroMoney.length,
+      zeroMoneyWithFoodCount: zeroMoneyWithFood.length,
+      zeroMoneyWithoutFoodCount: zeroMoney.length - zeroMoneyWithFood.length,
+      physicalWealth,
       productivityBins: productivityDistribution.counts,
       productivityBinSums: productivityDistribution.sums,
       productivityBinEdges: productivityDistribution.edges,
