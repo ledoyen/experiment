@@ -41,6 +41,21 @@ export const ACTIVITIES: ActivityDefinition[] = [
   { job: "outillage", labelKey: "job.outillage", output: "outil", initialWorkerShare: 0.07, annualCapacityPerWorker: 1, annualOutputPerCapacity: 50, capacityUnit: "artisan", competence: "artisanat" }
 ];
 
+export const DURABLE_FOOD_GOODS: Good[] = [
+  "ble", "pomme_de_terre", "legumineuses", "huile_olive"
+];
+
+export const INITIAL_DURABLE_FOOD_STOCK_DAYS = 90;
+
+export function initialFoodStockPerPerson(good: Good): number {
+  if (!DURABLE_FOOD_GOODS.includes(good)) return 0;
+  const activity = ACTIVITIES.find(item => item.output === good);
+  if (!activity) return 0;
+  const annualPerWorker = annualOutputPerWorker(activity);
+  const share = activity.initialWorkerShare / Math.max(ACTIVE_WORKER_SHARE, 1);
+  return annualPerWorker * share * INITIAL_DURABLE_FOOD_STOCK_DAYS / 365;
+}
+
 export const ACTIVE_WORKER_SHARE = ACTIVITIES
   .filter(activity => !activity.dormant)
   .reduce((sum, activity) => sum + activity.initialWorkerShare, 0);
