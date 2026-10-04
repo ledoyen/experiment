@@ -184,8 +184,7 @@ export function foodToNutrition(food: FoodNutrition, quantity: number, good?: Go
 }
 
 
-/** Lowest energy reserve. Zero is the simulation death boundary, not a medical threshold. */
- compatible with life in the current simulation model. */
+/** Zero is the simulation death boundary, not a medical threshold. */
 export const MINIMUM_SURVIVABLE_ENERGY_RESERVE_KCAL = 0;
 
 export function isLethalNutritionState(reserves: NutritionReserves): boolean {
