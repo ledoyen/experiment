@@ -6,7 +6,6 @@ function runDays(world: World, days: number): number[] {
   const populations: number[] = [];
   for (let day = 0; day < days; day++) {
     world.step(1440, 1440);
-    console.log("day", day + 1, "population", world.agents.length, "stocks", world.getMetrics().stocks, "energy", world.agents[0]?.reserves.energy.value);
     populations.push(world.agents.length);
   }
   return populations;
@@ -26,8 +25,7 @@ describe("simulation behavioral invariants", () => {
     });
 
     const populations = runDays(world, 30);
-    console.log("no-money populations", populations);
-    console.log("no-money stocks", world.getMetrics().stocks);
+    
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(180);
   });
 
