@@ -1046,6 +1046,8 @@ this.removeDeadAgents();
 
     for (const agent of this.agents) {
       if (isLethalNutritionState(agent.reserves)) {
+        const lowest = Object.entries(agent.reserves).sort((a, b) => a[1].value / a[1].max - b[1].value / b[1].max)[0];
+        console.log("death-cause", this.minute, lowest?.[0], lowest?.[1].value, lowest?.[1].max);
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
