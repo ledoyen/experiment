@@ -6,6 +6,7 @@ function runDays(world: World, days: number): number[] {
   const populations: number[] = [];
   for (let day = 0; day < days; day++) {
     world.step(1440, 1440);
+    console.log("day", day + 1, "population", world.agents.length, "stocks", world.getMetrics().stocks, "energy", world.agents[0]?.reserves.energy.value);
     populations.push(world.agents.length);
   }
   return populations;
