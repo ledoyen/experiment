@@ -5,10 +5,55 @@ export interface ActivityDefinition {
   job: Exclude<Job, "idle">;
   labelKey: string;
   output: Good;
-  referenceEtp: number;
-  annualOutputFor1000: number;
+  annualCapacityPerWorker: number;
+  annualOutputPerCapacity: number;
+  capacityUnit: string;
   competence: string;
   dormant?: boolean;
+}
+
+/**
+ * Production pré-industrielle.
+ *
+ * Chaque activité est décrite par deux choses simples :
+ * - la capacité qu'un travailleur peut gérer pendant un an ;
+ * - la production annuelle de cette capacité.
+ *
+ * Exemple : 15 vaches × 600 L/vache/an = 9 000 L de lait/an.
+ * Les valeurs sont volontairement prudentes : pas de tracteur,
+ * engrais minéral, pesticide ou sélection animale moderne.
+ */
+export const ACTIVITIES: ActivityDefinition[] = [
+  { job: "agriculture_ble", labelKey: "job.agriculture_ble", output: "ble", annualCapacityPerWorker: 1, annualOutputPerCapacity: 1200, capacityUnit: "ha", competence: "agriculture" },
+  { job: "agriculture_pomme_de_terre", labelKey: "job.agriculture_pomme_de_terre", output: "pomme_de_terre", annualCapacityPerWorker: 0.25, annualOutputPerCapacity: 6000, capacityUnit: "ha", competence: "agriculture" },
+  { job: "agriculture_legumineuses", labelKey: "job.agriculture_legumineuses", output: "legumineuses", annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 700, capacityUnit: "ha", competence: "agriculture" },
+  { job: "horticulture_legumes", labelKey: "job.horticulture_legumes", output: "legumes", annualCapacityPerWorker: 0.1, annualOutputPerCapacity: 5000, capacityUnit: "ha", competence: "horticulture" },
+  { job: "arboriculture_fruits", labelKey: "job.arboriculture_fruits", output: "fruits", annualCapacityPerWorker: 0.3, annualOutputPerCapacity: 2000, capacityUnit: "ha", competence: "arboriculture" },
+  { job: "oliviculture", labelKey: "job.oliviculture", output: "huile_olive", annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 150, capacityUnit: "ha", competence: "arboriculture" },
+  { job: "élevage_lait", labelKey: "job.elevage_lait", output: "lait", annualCapacityPerWorker: 15, annualOutputPerCapacity: 600, capacityUnit: "vache", competence: "élevage" },
+  { job: "aviculture_oeufs", labelKey: "job.aviculture_oeufs", output: "oeufs", annualCapacityPerWorker: 100, annualOutputPerCapacity: 6, capacityUnit: "kg/œuf/hen", competence: "élevage" },
+  { job: "pêche", labelKey: "job.peche", output: "poisson", annualCapacityPerWorker: 1, annualOutputPerCapacity: 500, capacityUnit: "pêcheur", competence: "pêche" },
+  { job: "chasse", labelKey: "job.chasse", output: "gibier", annualCapacityPerWorker: 0, annualOutputPerCapacity: 0, capacityUnit: "chasseur", competence: "chasse", dormant: true },
+  { job: "textile", labelKey: "job.textile", output: "vetement", annualCapacityPerWorker: 1, annualOutputPerCapacity: 100, capacityUnit: "artisan", competence: "artisanat" },
+  { job: "construction", labelKey: "job.construction", output: "logement", annualCapacityPerWorker: 1, annualOutputPerCapacity: 20, capacityUnit: "artisan", competence: "construction", dormant: true },
+  { job: "bois_chauffage", labelKey: "job.bois_chauffage", output: "chauffage", annualCapacityPerWorker: 1, annualOutputPerCapacity: 5, capacityUnit: "bûcheron", competence: "foresterie" },
+  { job: "outillage", labelKey: "job.outillage", output: "outil", annualCapacityPerWorker: 1, annualOutputPerCapacity: 50, capacityUnit: "artisan", competence: "artisanat" }
+];
+
+export const ACTIVE_REFERENCE_ETP = ACTIVITIES
+  .filter(activity => !activity.dormant)
+  .reduce((sum, activity) => sum + activity.annualCapacityPerWorker, 0);
+
+export function annualOutputPerWorker(activity: ActivityDefinition): number {
+  return activity.annualCapacityPerWorker * activity.annualOutputPerCapacity;
+}
+
+export function dailyOutputPerWorker(activity: ActivityDefinition): number {
+  return annualOutputPerWorker(activity) / 365;
+}
+
+export function activityByJob(job: Job): ActivityDefinition | undefined {
+  return ACTIVITIES.find(activity => activity.job === job);
 }
 
 export const GOODS: Good[] = [
@@ -89,7 +134,7 @@ export const GOOD_PRICE_UNIT: Record<Good, string> = {
   legumes: "kg",
   fruits: "kg",
   huile_olive: "kg",
-  lait: "kg",
+  lait: "L",
   oeufs: "kg",
   volaille: "kg",
   porc: "kg",
