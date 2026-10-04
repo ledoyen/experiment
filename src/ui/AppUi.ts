@@ -1,7 +1,7 @@
 import type { Parameters, Metrics, Agent, AgentEvent, Good, Job } from "../data/types";
 import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
 import { NUTRITION, type NutritionId } from "../data/nutrition";
-import { chartTimeResolution, simulationTimeParts } from "../data/glossary";
+import { chartTimeResolution, simulationTimeParts, estimateFoodAutonomyDays } from "../data/glossary";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
@@ -410,8 +410,26 @@ export class AppUi {
       { title: t("phys.section.minerals"), ids: ["calcium", "iron", "magnesium", "zinc", "iodine", "selenium"] }
     ];
 
+    const stocks = Object.entries(agent.inventory)
+      .filter(([, quantity]) => (quantity ?? 0) > 1e-9)
+      .sort(([a], [b]) => a.localeCompare(b));
+    const autonomyDays = estimateFoodAutonomyDays(
+      agent.reserves, agent.sex, agent.state, agent.inventory,
+      this.world.prices, agent.metabolicFactor
+    );
+
     return topRows + `
-      <div class="physiology-gauges full-profile">
+      <div class="agent-section">
+        <div class="agent-section-title">${t("stock")}</div>
+        <div class="agent-stock-list">
+          ${stocks.length
+            ? stocks.map(([good, quantity]) => `<div class="agent-row"><span>${t("good." + good)}</span><strong>${formatValue(quantity ?? 0)} ${GOOD_PRICE_UNIT[good as Good]}</strong></div>`).join("")
+            : `<div class="empty-events">${t("noStock")}</div>`}
+        </div>
+        <div class="agent-row"><span>${t("foodAutonomy")}</span><strong>${autonomyDays === null ? "365+ " + t("day") : autonomyDays.toFixed(1) + " " + t("day")}</strong></div>
+      </div>
+      <div class="physiology-gauges full-profile">`
+
         ${sections.map(section => `
           <div class="phys-section-title">${section.title}</div>
           ${this.nutritionGaugeMarkup(agent, section.ids)}
