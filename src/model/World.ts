@@ -154,7 +154,9 @@ export class World {
           INITIAL_RESERVE_MIN_RATIO + Math.random() * (1 - INITIAL_RESERVE_MIN_RATIO),
           metabolicFactor
         ),
-        inventory: {},
+        inventory: Object.fromEntries(
+          DURABLE_FOOD_GOODS.map(good => [good, initialFoodStockPerPerson(good)])
+        ),
         forSale: {},
         askPrices: {},
         events: [],
