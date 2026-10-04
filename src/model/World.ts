@@ -66,6 +66,7 @@ export class World {
     parameterEvents: ParameterChangeEvent[];
   }> = [];
   private readonly parameterEvents: ParameterChangeEvent[] = [];
+  private readonly snapshotWindowMinutes = 60;
   private runInitialParameters: Parameters;
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
@@ -339,7 +340,7 @@ export class World {
 
   private capture() {
     this.history.push(this.getMetrics());
-    this.compactHistory();
+    if (this.history.length > 5000) this.compactHistory();
     this.snapshots.push({
       minute: this.minute,
       prices: { ...this.prices },
@@ -364,15 +365,10 @@ export class World {
   }
 
   private compactSnapshots() {
-    const now = this.minute;
-    const buckets = new Map<string, (typeof this.snapshots)[number]>();
-    for (const snapshot of this.snapshots) {
-      const age = now - snapshot.minute;
-      const key = age < 60 ? "m10:" + snapshot.minute : age < 1440 ? "h:" + Math.floor(snapshot.minute / 60) : age < 43200 ? "d:" + Math.floor(snapshot.minute / 1440) : "mo:" + Math.floor(snapshot.minute / 43200);
-      const existing = buckets.get(key);
-      if (!existing || snapshot.minute > existing.minute) buckets.set(key, snapshot);
+    const cutoff = this.minute - this.snapshotWindowMinutes;
+    while (this.snapshots.length > 1 && this.snapshots[1].minute >= cutoff) {
+      this.snapshots.shift();
     }
-    this.snapshots.splice(0, this.snapshots.length, ...[...buckets.values()].sort((a, b) => a.minute - b.minute));
   }
 
   private advanceChunk(minutes: number) {
