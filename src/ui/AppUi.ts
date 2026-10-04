@@ -432,8 +432,7 @@ export class AppUi {
         </div>
         <div class="agent-row"><span>${t("foodAutonomy")}</span><strong>${autonomyDays === null ? "365+ " + t("day") : autonomyDays.toFixed(1) + " " + t("day")}</strong></div>
       </div>
-      <div class="physiology-gauges full-profile">`
-
+      <div class="physiology-gauges full-profile">
         ${sections.map(section => `
           <div class="phys-section-title">${section.title}</div>
           ${this.nutritionGaugeMarkup(agent, section.ids)}
