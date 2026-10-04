@@ -52,8 +52,9 @@ export const FOOD_PRIORITY_TIERS = [
     "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C",
     "vitamin_E", "vitamin_K",
     "calcium", "iron", "magnesium", "zinc", "iodine", "selenium"
-  ] as const
-];
+  ] as const,
+  ["energy"] as const
+] as const;
 
 type TierId = typeof FOOD_PRIORITY_TIERS[number][number];
 
