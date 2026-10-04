@@ -95,6 +95,10 @@ export interface Metrics {
   wealthTotal: number;
   wealthMin: number;
   wealthMax: number;
+  zeroMoneyCount: number;
+  zeroMoneyWithFoodCount: number;
+  zeroMoneyWithoutFoodCount: number;
+  physicalWealth: number;
   productivityBins: number[];
   productivityBinSums: number[];
   productivityBinEdges: number[];
