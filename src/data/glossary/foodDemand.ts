@@ -13,6 +13,7 @@ import {
   NUTRITION,
   foodToNutrition,
   targetFor,
+  applyNutritionDay,
   type NutritionReserves
 } from "../nutrition";
 import type {
@@ -234,4 +235,31 @@ export function planFoodDemand(
   }
 
   return demand;
+}
+
+export function estimateFoodAutonomyDays(
+  reserves: NutritionReserves,
+  sex: Sex,
+  state: PhysiologyState,
+  inventory: Partial<Record<Good, number>>,
+  prices: Partial<Record<Good, number>>,
+  requirementFactor = 1,
+  maxDays = 365
+): number | null {
+  let current = reserves;
+  let stock = { ...inventory };
+  for (let day = 0; day < maxDays; day++) {
+    const demand = planFoodDemand(current, sex, state, Number.POSITIVE_INFINITY, prices, stock, requirementFactor);
+    const quantities = Object.entries(demand) as Array<[Good, number]>;
+    if (!quantities.length) return day;
+    const intake = {} as Partial<Record<typeof NUTRITION[number]["id"], number>>;
+    for (const [good, quantity] of quantities) {
+      stock[good] = Math.max(0, (stock[good] ?? 0) - quantity);
+      const contribution = foodToNutrition(FOOD_NUTRITION[good]!, quantity);
+      for (const nutrient of NUTRITION) intake[nutrient.id] = (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
+    }
+    current = applyNutritionDay(current, intake, sex, state, requirementFactor);
+    if (current.energy.value <= 0) return day + 1;
+  }
+  return null;
 }
