@@ -1038,6 +1038,7 @@ const population = Math.max(1, this.agents.length);
       }
     }
 
+    if (this.minute % 28800 === 0) console.log("long-term", this.minute, this.agents.length, this.getStockTotals());
     this.removeDeadAgents();
   }
 
