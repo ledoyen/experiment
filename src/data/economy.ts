@@ -55,7 +55,7 @@ export const DURABLE_FOOD_GOODS: Good[] = [
   "ble", "pomme_de_terre", "legumineuses", "huile_olive"
 ];
 
-// 90 days is a modelling starting point, deliberately finite: storage exists, but is not an unlimited buffer. Historical grain reserves are well documented. Source: https://www.fao.org/4/w4979e/w4979e04.htm
+// 180 days is a deliberately generous starting reserve so the first harvest-to-harvest cycle is not an artifact of starting with empty stores. It is a simulation assumption, not a universal historical constant. Source: https://www.fao.org/4/w4979e/w4979e04.htm
 export const INITIAL_DURABLE_FOOD_STOCK_DAYS = 180;
 
 // Pure bookkeeping conversion from annual production to an initial household reserve.
