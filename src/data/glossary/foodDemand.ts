@@ -162,9 +162,8 @@ export function decidePurchases(
           moneyLeft / offer.price
         );
 
-        const energyPerUnit = Math.max(1, contribution.energy ?? 0);
         const score = quantity > 0
-          ? benefit / (offer.price * energyPerUnit)
+          ? benefit / offer.price
           : 0;
         if (score > bestScore) {
           bestScore = score;
