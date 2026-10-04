@@ -41,8 +41,11 @@ function cheapestFoodOffers(
   return [...cheapest.values()];
 }
 
+// Macronutrients and micronutrients are solved before the final energy fill.
+// This avoids consuming an energy-dense staple simply because it is the cheapest
+// way to satisfy a later vitamin/mineral need. Energy balance is a separate
+// physiological constraint. Reference: https://www.anses.fr/en/system/files/NUT2012SA0103Ra-1EN.pdf
 export const FOOD_PRIORITY_TIERS = [
-  ["energy"] as const,
   ["protein", "carbohydrate", "fat", "fiber"] as const,
   [
     "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3",
@@ -158,7 +161,10 @@ export function decidePurchases(
           moneyLeft / offer.price
         );
 
-        const score = quantity > 0 ? benefit / offer.price : 0;
+        const energyPerUnit = Math.max(1, contribution.energy ?? 0);
+        const score = quantity > 0
+          ? benefit / (offer.price * energyPerUnit)
+          : 0;
         if (score > bestScore) {
           bestScore = score;
           bestOffer = offer;
