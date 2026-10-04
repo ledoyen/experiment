@@ -51,9 +51,13 @@ export interface FoodNutrition {
   selenium: number;
 }
 
+// Start with at least 90% of each physiological reserve: this avoids an artificial day-one deficit while keeping individuals heterogeneous. This is a simulation initial condition, not a medical recommendation.
 export const INITIAL_RESERVE_MIN_RATIO = 0.90;
+
+// ±10% individual variation is a deliberately small modelling range around the population reference values; real nutrient needs vary with sex, size, activity and physiological state. Source: https://www.efsa.europa.eu/fr/topics/topic/dietary-reference-values
 export const INDIVIDUAL_REQUIREMENT_VARIANCE = 0.10;
 
+// Adult reference values are based on ANSES/EFSA dietary reference values; the model keeps the initial scope intentionally small and uses sex-specific values where the source supports them. Source: https://www.anses.fr/en/system/files/NUT2012SA0103Ra-1EN.pdf
 export const NUTRITION: NutritionDefinition[] = [
   { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 7, target: { male: 2500, female: 2000 } },
   { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, target: { male: 58.1, female: 58.1 } },
@@ -78,10 +82,12 @@ export const NUTRITION: NutritionDefinition[] = [
   { id: "selenium", labelKey: "phys.selenium", unit: "µg", maxDays: 30, target: { male: 70, female: 70 } }
 ];
 
+// Milk is displayed and stored in litres; 1 L of milk is approximately 1.03 kg, used only to convert volume to mass for nutrition data. Source: https://www.fao.org/4/t0251e/t0251e01.htm
 export const FOOD_DENSITY_KG_PER_UNIT: Partial<Record<Good, number>> = {
   lait: 1.03
 };
 
+// Nutrient composition is expressed per 100 g; values are based on representative food composition data. They should be replaced with exact Ciqual entries when the simulation food list is finalized. Source: https://ciqual.anses.fr/cms/en/2025-anses-ciqual-table
 export const FOOD_NUTRITION: Partial<Record<Good, FoodNutrition>> = {
   ble: { kcal: 340, protein: 13.5, carbohydrate: 60, fat: 2.5, fiber: 10.7, vitamin_A: 0, vitamin_B1: .45, vitamin_B2: .1, vitamin_B3: 4.7, vitamin_B6: .34, vitamin_B9: 40, vitamin_B12: 0, vitamin_C: 0, vitamin_E: 1, vitamin_K: 2, calcium: 34, iron: 3.8, magnesium: 126, zinc: 2.9, iodine: 0, selenium: 70 },
   pomme_de_terre: { kcal: 80, protein: 1.8, carbohydrate: 16.7, fat: .3, fiber: 2.2, vitamin_A: 0, vitamin_B1: .08, vitamin_B2: .03, vitamin_B3: 1.4, vitamin_B6: .3, vitamin_B9: 17, vitamin_B12: 0, vitamin_C: 15, vitamin_E: .1, vitamin_K: 2, calcium: 12, iron: .7, magnesium: 23, zinc: .3, iodine: 0, selenium: 0 },
@@ -97,12 +103,14 @@ export const FOOD_NUTRITION: Partial<Record<Good, FoodNutrition>> = {
   huile_olive: { kcal: 884, protein: 0, carbohydrate: 0, fat: 100, fiber: 0, vitamin_A: 0, vitamin_B1: 0, vitamin_B2: 0, vitamin_B3: 0, vitamin_B6: 0, vitamin_B9: 0, vitamin_B12: 0, vitamin_C: 0, vitamin_E: 14.4, vitamin_K: 0, calcium: 1, iron: 0, magnesium: 0, zinc: 0, iodine: 0, selenium: 0 }
 };
 
+// Pure selection of the applicable reference intake for the individual's physiological state.
 export function targetFor(nutrient: NutritionDefinition, sex: Sex, state: PhysiologyState): number {
   if (state === "pregnancy" && nutrient.pregnancy !== undefined) return nutrient.pregnancy;
   if (state === "lactation" && nutrient.lactation !== undefined) return nutrient.lactation;
   return nutrient.target[sex];
 }
 
+// Pure construction of physiological reserves from a target and a maximum tolerated deficit period.
 export function createNutritionReserves(
   sex: Sex,
   state: PhysiologyState,
@@ -124,6 +132,7 @@ export function createNutritionReserves(
   ) as NutritionReserves;
 }
 
+// Pure daily reserve update: intake replenishes the reserve and the physiological target consumes it.
 export function applyNutritionDay(
   reserves: NutritionReserves,
   intake: Partial<Record<NutritionId, number>>,
@@ -144,6 +153,7 @@ export function applyNutritionDay(
   return next;
 }
 
+// Pure unit conversion from a food quantity to nutrient intake.
 export function foodToNutrition(food: FoodNutrition, quantity: number, good?: Good): Partial<Record<NutritionId, number>> {
   // Food composition is expressed per 100 g. Most stocks are in kg.
   const quantityKg = quantity * (good ? FOOD_DENSITY_KG_PER_UNIT[good] ?? 1 : 1);
@@ -174,7 +184,8 @@ export function foodToNutrition(food: FoodNutrition, quantity: number, good?: Go
 }
 
 
-/** Lowest energy reserve compatible with life in the current simulation model. */
+/** Lowest energy reserve. Zero is the simulation death boundary, not a medical threshold. */
+ compatible with life in the current simulation model. */
 export const MINIMUM_SURVIVABLE_ENERGY_RESERVE_KCAL = 0;
 
 export function isLethalNutritionState(reserves: NutritionReserves): boolean {
