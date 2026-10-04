@@ -108,5 +108,7 @@
   "event.previousIncome": "Previous job income",
   "event.expectedIncome": "Expected income",
   "exportAnalysis": "Export analysis data",
-  "stock": "Stock"
+  "stock": "Stock",
+  "noStock": "No stock",
+  "foodAutonomy": "Food autonomy"
 }
