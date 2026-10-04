@@ -547,6 +547,10 @@ export class World {
     // The market is a list of individual offers. The same good may therefore
     // exist several times at different prices and with different sellers.
     const offers = buildAvailableGoods(this.agents, prices);
+    const agentsById = new Map(this.agents.map(agent => [agent.id, agent]));
+    const offersByKey = new Map(
+      offers.map(offer => [offer.name + ":" + offer.sellerId + ":" + offer.price, offer])
+    );
 
     const offeredStock = {} as Record<Good, number>;
     for (const offer of offers) {
@@ -651,12 +655,8 @@ export class World {
         requestsByHuman.set(buyer.id, decisions);
 
         for (const decision of decisions) {
-          const offer = offers.find(
-            candidate =>
-              candidate.name === decision.name &&
-              candidate.sellerId === decision.sellerId &&
-              Math.abs(candidate.price - decision.price) < 1e-12 &&
-              candidate.stock > 1e-12
+          const offer = offersByKey.get(
+            decision.name + ":" + decision.sellerId + ":" + decision.price
           );
           if (!offer) continue;
 
@@ -680,9 +680,7 @@ export class World {
         const rationing = Math.min(1, offer.stock / totalRequested);
 
         for (const request of requests) {
-          const seller = this.agents.find(
-            human => human.id === offer.sellerId
-          );
+          const seller = agentsById.get(offer.sellerId);
           if (!seller) continue;
 
           const executed = executePurchase(
@@ -732,14 +730,9 @@ export class World {
       );
 
       for (const decision of heatingDecisions) {
-        const seller = this.agents.find(
-          human => human.id === decision.sellerId
-        );
-        const offer = offers.find(
-          candidate =>
-            candidate.name === decision.name &&
-            candidate.sellerId === decision.sellerId &&
-            Math.abs(candidate.price - decision.price) < 1e-12
+        const seller = agentsById.get(decision.sellerId);
+        const offer = offersByKey.get(
+          decision.name + ":" + decision.sellerId + ":" + decision.price
         );
 
         if (!seller || !offer) continue;
