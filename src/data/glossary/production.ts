@@ -18,22 +18,22 @@ type SeasonalProfile = Record<Season, number>;
 
 export const PRODUCTION_SEASONALITY: Partial<Record<Job, SeasonalProfile>> = {
   agriculture_ble: {
-    winter: 0.1, spring: 0.5, summer: 2.8, autumn: 0.6
+    winter: 0.8, spring: 0.8, summer: 1.4, autumn: 1.0
   },
   agriculture_pomme_de_terre: {
-    winter: 0.2, spring: 1.3, summer: 1.6, autumn: 0.9
+    winter: 0.8, spring: 0.8, summer: 1.2, autumn: 1.2
   },
   agriculture_legumineuses: {
-    winter: 0.2, spring: 1.2, summer: 1.8, autumn: 0.8
+    winter: 0.8, spring: 0.8, summer: 1.4, autumn: 1.0
   },
   horticulture_legumes: {
-    winter: 0.7, spring: 1.3, summer: 1.2, autumn: 0.8
+    winter: 0.8, spring: 1.2, summer: 1.2, autumn: 0.8
   },
   arboriculture_fruits: {
-    winter: 0.4, spring: 1.3, summer: 1.6, autumn: 0.7
+    winter: 0.5, spring: 1.0, summer: 1.8, autumn: 0.7
   },
   oliviculture: {
-    winter: 0.2, spring: 0.8, summer: 1.7, autumn: 1.3
+    winter: 0.5, spring: 0.8, summer: 1.2, autumn: 1.5
   },
   "élevage_lait": {
     winter: 0.9, spring: 1.0, summer: 1.1, autumn: 1.0
