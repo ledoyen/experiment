@@ -366,7 +366,7 @@ export class World {
 
   private compactSnapshots() {
     const cutoff = this.minute - this.snapshotWindowMinutes;
-    while (this.snapshots.length > 1 && this.snapshots[1].minute >= cutoff) {
+    while (this.snapshots.length > 1 && this.snapshots[1].minute < cutoff) {
       this.snapshots.shift();
     }
   }
