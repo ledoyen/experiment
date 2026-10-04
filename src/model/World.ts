@@ -938,8 +938,7 @@ export class World {
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
-    if (this.minute % 28800 === 0) console.log("stocks", this.minute, this.getStockTotals());
-    const population = Math.max(1, this.agents.length);
+const population = Math.max(1, this.agents.length);
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
     ) as Partial<Record<Good, number>>;
@@ -1047,8 +1046,6 @@ export class World {
 
     for (const agent of this.agents) {
       if (isLethalNutritionState(agent.reserves)) {
-        const lowest = Object.entries(agent.reserves).sort((a, b) => a[1].value / a[1].max - b[1].value / b[1].max)[0];
-        console.log("death", this.minute, lowest?.[0], lowest?.[1].value, lowest?.[1].max, agent.reserves.energy.value);
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
