@@ -88,46 +88,6 @@ export const INITIAL_PRICE: Record<Good, number> = Object.fromEntries(
   ])
 ) as Record<Good, number>;
 
-const activityRows: Array<[Exclude<Job, "idle">, string, Good, number, number, string, boolean?]> = [
-  ["agriculture_ble", "job.agriculture_ble", "ble", 164.25, 109500, "agriculture"],
-  ["agriculture_pomme_de_terre", "job.agriculture_pomme_de_terre", "pomme_de_terre", 16.425, 109500, "agriculture"],
-  ["agriculture_legumineuses", "job.agriculture_legumineuses", "legumineuses", 54.75, 36500, "agriculture"],
-  ["horticulture_legumes", "job.horticulture_legumes", "legumes", 21.9, 146000, "horticulture"],
-  ["arboriculture_fruits", "job.arboriculture_fruits", "fruits", 32.85, 109500, "arboriculture"],
-  ["oliviculture", "job.oliviculture", "huile_olive", 38, 9120, "arboriculture"],
-  ["élevage_lait", "job.elevage_lait", "lait", 8.11111111111111, 146000, "élevage"],
-  ["aviculture_oeufs", "job.aviculture_oeufs", "oeufs", 0.48666666666666664, 18250, "élevage"],
-  ["pêche", "job.peche", "poisson", 29.2, 36500, "pêche"],
-  ["chasse", "job.chasse", "gibier", 0, 0, "chasse", true],
-  ["textile", "job.textile", "vetement", 50, 1000, "artisanat"],
-  ["construction", "job.construction", "logement", 25, 333.3333333333333, "construction", true],
-  ["bois_chauffage", "job.bois_chauffage", "chauffage", 50, 1000, "foresterie"],
-  ["outillage", "job.outillage", "outil", 3, 300, "artisanat"]
-];
-
-export const ACTIVITIES: ActivityDefinition[] = activityRows.map(
-  ([job, labelKey, output, referenceEtp, annualOutputFor1000, competence, dormant]) => ({
-    job, labelKey, output, referenceEtp, annualOutputFor1000, competence, dormant
-  })
-);
-
-export const ACTIVE_REFERENCE_ETP = ACTIVITIES
-  .filter(activity => !activity.dormant && activity.referenceEtp > 0)
-  .reduce((sum, activity) => sum + activity.referenceEtp, 0);
-
-export const FOOD_PRODUCTION_CALIBRATION = 5;
-
-export function dailyOutputPerEtp(activity: ActivityDefinition): number {
-  const base = activity.annualOutputFor1000 / activity.referenceEtp / 365;
-  return FOOD_GOODS.includes(activity.output)
-    ? base * FOOD_PRODUCTION_CALIBRATION
-    : base;
-}
-
-export function activityByJob(job: Job): ActivityDefinition | undefined {
-  return ACTIVITIES.find(activity => activity.job === job);
-}
-
 export const GOOD_PRICE_UNIT: Record<Good, string> = {
   ble: "kg",
   pomme_de_terre: "kg",
