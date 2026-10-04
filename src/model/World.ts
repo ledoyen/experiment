@@ -494,7 +494,7 @@ export class World {
       const food = FOOD_NUTRITION[good];
       if (!food) continue;
 
-      const contribution = foodToNutrition(food, quantity);
+      const contribution = foodToNutrition(food, quantity, good);
       for (const nutrient of NUTRITION) {
         intake[nutrient.id] =
           (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
@@ -598,7 +598,7 @@ export class World {
 
       const intake = purchasedIntake.get(human.id) ??
         ({} as Partial<Record<NutritionId, number>>);
-      const contribution = foodToNutrition(food, quantity);
+      const contribution = foodToNutrition(food, quantity, good);
 
       for (const nutrient of NUTRITION) {
         intake[nutrient.id] =
@@ -985,7 +985,7 @@ export class World {
         const food = FOOD_NUTRITION[good];
         if (quantity <= 0 || !food) continue;
 
-        const contribution = foodToNutrition(food, quantity);
+        const contribution = foodToNutrition(food, quantity, good);
         for (const nutrient of NUTRITION) {
           intake[nutrient.id] =
             (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
