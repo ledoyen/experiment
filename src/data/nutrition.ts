@@ -78,6 +78,10 @@ export const NUTRITION: NutritionDefinition[] = [
   { id: "selenium", labelKey: "phys.selenium", unit: "µg", maxDays: 30, target: { male: 70, female: 70 } }
 ];
 
+export const FOOD_DENSITY_KG_PER_UNIT: Partial<Record<Good, number>> = {
+  lait: 1.03
+};
+
 export const FOOD_NUTRITION: Partial<Record<Good, FoodNutrition>> = {
   ble: { kcal: 340, protein: 13.5, carbohydrate: 60, fat: 2.5, fiber: 10.7, vitamin_A: 0, vitamin_B1: .45, vitamin_B2: .1, vitamin_B3: 4.7, vitamin_B6: .34, vitamin_B9: 40, vitamin_B12: 0, vitamin_C: 0, vitamin_E: 1, vitamin_K: 2, calcium: 34, iron: 3.8, magnesium: 126, zinc: 2.9, iodine: 0, selenium: 70 },
   pomme_de_terre: { kcal: 80, protein: 1.8, carbohydrate: 16.7, fat: .3, fiber: 2.2, vitamin_A: 0, vitamin_B1: .08, vitamin_B2: .03, vitamin_B3: 1.4, vitamin_B6: .3, vitamin_B9: 17, vitamin_B12: 0, vitamin_C: 15, vitamin_E: .1, vitamin_K: 2, calcium: 12, iron: .7, magnesium: 23, zinc: .3, iodine: 0, selenium: 0 },
@@ -140,8 +144,9 @@ export function applyNutritionDay(
   return next;
 }
 
-export function foodToNutrition(food: FoodNutrition, quantityKg: number): Partial<Record<NutritionId, number>> {
-  // Food composition is expressed per 100 g. Market quantities are in kg.
+export function foodToNutrition(food: FoodNutrition, quantity: number, good?: Good): Partial<Record<NutritionId, number>> {
+  // Food composition is expressed per 100 g. Most stocks are in kg.
+  const quantityKg = quantity * (good ? FOOD_DENSITY_KG_PER_UNIT[good] ?? 1 : 1);
   const unitsOf100g = quantityKg * 1000 / 100;
   return {
     energy: food.kcal * unitsOf100g,
