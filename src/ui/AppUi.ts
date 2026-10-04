@@ -7,7 +7,7 @@ import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 import { buildAnalysisCsv } from "../analysis/buildAnalysisCsv";
 
-type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population";
+type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population" | "physicalWealth" | "zeroMoneyWithoutFood";
 type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}` | `stock:${Good}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
@@ -15,7 +15,9 @@ const SERIES_COLORS: Record<string, string> = {
   medianWealth: "#9fe870",
   gini: "#f4b942",
   moneySupply: "#d1d5db",
-  population: "#ff9f68"
+  population: "#ff9f68",
+  physicalWealth: "#8dd3c7",
+  zeroMoneyWithoutFood: "#fb8072"
 };
 
 const PRICE_CURRENCY_SYMBOL = "🪙";
@@ -127,6 +129,8 @@ export class AppUi {
           ${this.check("gini", "gini")}
           ${this.check("moneySupply", "moneySupply")}
           ${this.check("population", "livingPopulation")}
+          ${this.check("physicalWealth", "physicalWealth")}
+          ${this.check("zeroMoneyWithoutFood", "zeroMoneyWithoutFood")}
           ${this.check("price:ble", "good.ble")}
         </div>
         <details class="price-choices">
