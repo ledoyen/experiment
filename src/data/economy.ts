@@ -31,7 +31,7 @@ export const ACTIVITIES: ActivityDefinition[] = [
   { job: "arboriculture_fruits", labelKey: "job.arboriculture_fruits", output: "fruits", annualCapacityPerWorker: 0.3, annualOutputPerCapacity: 2000, capacityUnit: "ha", competence: "arboriculture" },
   { job: "oliviculture", labelKey: "job.oliviculture", output: "huile_olive", annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 150, capacityUnit: "ha", competence: "arboriculture" },
   { job: "élevage_lait", labelKey: "job.elevage_lait", output: "lait", annualCapacityPerWorker: 15, annualOutputPerCapacity: 600, capacityUnit: "vache", competence: "élevage" },
-  { job: "aviculture_oeufs", labelKey: "job.aviculture_oeufs", output: "oeufs", annualCapacityPerWorker: 100, annualOutputPerCapacity: 6, capacityUnit: "kg/œuf/hen", competence: "élevage" },
+  { job: "aviculture_oeufs", labelKey: "job.aviculture_oeufs", output: "oeufs", annualCapacityPerWorker: 100, annualOutputPerCapacity: 6, capacityUnit: "poule", competence: "élevage" },
   { job: "pêche", labelKey: "job.peche", output: "poisson", annualCapacityPerWorker: 1, annualOutputPerCapacity: 500, capacityUnit: "pêcheur", competence: "pêche" },
   { job: "chasse", labelKey: "job.chasse", output: "gibier", annualCapacityPerWorker: 0, annualOutputPerCapacity: 0, capacityUnit: "chasseur", competence: "chasse", dormant: true },
   { job: "textile", labelKey: "job.textile", output: "vetement", annualCapacityPerWorker: 1, annualOutputPerCapacity: 100, capacityUnit: "artisan", competence: "artisanat" },
