@@ -938,6 +938,7 @@ export class World {
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
+    if (this.minute % 28800 === 0) console.log("stocks", this.minute, this.getStockTotals());
     const population = Math.max(1, this.agents.length);
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
