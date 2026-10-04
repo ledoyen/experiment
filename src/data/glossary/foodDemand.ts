@@ -27,6 +27,20 @@ import type {
 
 export const MAX_FOOD_PURCHASE_ROUNDS = 16;
 
+function cheapestFoodOffers(
+  market: readonly AvailableGood[],
+  buyerId: number
+): AvailableGood[] {
+  const cheapest = new Map<Good, AvailableGood>();
+  for (const offer of market) {
+    if (offer.sellerId === buyerId || offer.stock <= 1e-12) continue;
+    if (!FOOD_NUTRITION[offer.name] || !Number.isFinite(offer.price) || offer.price <= 0) continue;
+    const current = cheapest.get(offer.name);
+    if (!current || offer.price < current.price) cheapest.set(offer.name, offer);
+  }
+  return [...cheapest.values()];
+}
+
 export const FOOD_PRIORITY_TIERS = [
   ["energy"] as const,
   ["protein", "carbohydrate", "fat", "fiber"] as const,
@@ -88,7 +102,7 @@ export function decidePurchases(
       let bestQuantity = 0;
       let bestScore = 0;
 
-      for (const offer of market) {
+      for (const offer of cheapestFoodOffers(market, human.id)) {
         if (
           offer.sellerId === human.id ||
           offer.stock <= 1e-12 ||
