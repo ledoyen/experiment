@@ -1,4 +1,4 @@
-import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker } from "../data/economy";
+import { ACTIVITIES, ACTIVE_WORKER_SHARE, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker } from "../data/economy";
 import { MAX_FOOD_PURCHASE_ROUNDS } from "../data/glossary/foodDemand";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
@@ -102,8 +102,8 @@ export class World {
 
       const exact =
         this.parameters.population *
-        activity.annualCapacityPerWorker /
-        Math.max(ACTIVE_REFERENCE_ETP, 1);
+        activity.initialWorkerShare /
+        Math.max(ACTIVE_WORKER_SHARE, 1);
 
       const count = Math.floor(exact);
       allocations.push({
