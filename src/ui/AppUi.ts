@@ -49,7 +49,7 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key.startsWith("stock:")) return point.stocks[key.slice(6) as Good] ?? 0;
   if (key === "physicalWealth") return point.physicalWealth;
   if (key === "zeroMoneyWithoutFood") return point.zeroMoneyWithoutFoodCount;
-  return Number(point[key as BaseSeriesKey]);
+  return Number(point[key as Exclude<BaseSeriesKey, "physicalWealth" | "zeroMoneyWithoutFood">]);
 }
 
 function seriesLabel(key: SeriesKey): string {
