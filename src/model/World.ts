@@ -1038,8 +1038,7 @@ const population = Math.max(1, this.agents.length);
       }
     }
 
-    if (this.minute % 28800 === 0) console.log("long-term", this.minute, this.agents.length, this.getStockTotals());
-    this.removeDeadAgents();
+this.removeDeadAgents();
   }
 
   private removeDeadAgents() {
@@ -1047,7 +1046,6 @@ const population = Math.max(1, this.agents.length);
 
     for (const agent of this.agents) {
       if (isLethalNutritionState(agent.reserves)) {
-        console.log("death-nutrition", this.minute, agent.reserves.energy.value, agent.reserves.energy.max);
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
