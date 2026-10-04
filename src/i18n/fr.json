@@ -108,5 +108,7 @@
   "event.previousIncome": "Revenu du métier précédent",
   "event.expectedIncome": "Perspective de revenu",
   "exportAnalysis": "Exporter les données d'analyse",
-  "stock": "Stock"
+  "stock": "Stock",
+  "noStock": "Aucun stock",
+  "foodAutonomy": "Autonomie alimentaire"
 }
