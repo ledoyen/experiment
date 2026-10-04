@@ -213,16 +213,14 @@ export class World {
   }
 
   step(minutes = 1, captureInterval = 10) {
-    let remaining = Math.max(0, Math.floor(minutes));
-    const interval = Math.max(10, Math.floor(captureInterval));
+    const duration = Math.max(0, Math.floor(minutes));
+    if (duration <= 0) return;
 
-    while (remaining > 0) {
-      const nextCapture = Math.max(this.minute + 1, Math.floor(this.minute / interval) * interval + interval);
-      const chunk = Math.min(remaining, nextCapture - this.minute);
-      this.advanceChunk(chunk);
-      remaining -= chunk;
-      if (this.minute === nextCapture) this.capture();
-    }
+    const nextCapture = Math.floor(this.minute / captureInterval) * captureInterval + captureInterval;
+    const crossesCapture = this.minute + duration >= nextCapture;
+    this.advanceChunk(duration);
+
+    if (crossesCapture) this.capture();
   }
 
   rewind(minutes = 60) {
@@ -827,6 +825,18 @@ export class World {
     }
 
     // Professional mobility uses today's scarcity and actual sale prices.
+    const dailyDemand = { ...latentFoodDemand } as Record<Good, number>;
+    dailyDemand.chauffage = this.agents.reduce(
+      (sum, agent) => sum + heatingPurchaseNeed(
+        simulationDay,
+        agent.inventory.chauffage ?? 0
+      ),
+      0
+    );
+    for (const good of MAINTENANCE_GOODS) {
+      dailyDemand[good] = dailyMaintenanceNeed(good) * this.agents.length;
+    }
+
     const expectedIncome = (agent: Human, job: Job) => {
       const activity = activityByJob(job);
       if (!activity || activity.dormant) return 0;
@@ -837,21 +847,7 @@ export class World {
         seasonalProductionMultiplier(activity.job, simulationDay);
 
       const good = activity.output;
-      const demand =
-        good === "chauffage"
-          ? this.agents.reduce(
-              (sum, human) =>
-                sum +
-                heatingPurchaseNeed(
-                  simulationDay,
-                  human.inventory.chauffage ?? 0
-                ),
-              0
-            )
-          : MAINTENANCE_GOODS.includes(good as "vetement" | "outil")
-            ? dailyMaintenanceNeed(good as "vetement" | "outil") *
-              this.agents.length
-            : latentFoodDemand[good] ?? 0;
+      const demand = dailyDemand[good] ?? 0;
 
       const currentSupply = offeredStock[good] ?? 0;
       const transactionPrice =
