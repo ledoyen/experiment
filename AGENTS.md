@@ -16,7 +16,7 @@ Les fonctions de calcul qui utilisent ces valeurs et qui ne dépendent pas de l'
 Une valeur ou une règle doit être :
 - **simple** ;
 - **bien nommée** ;
-- accompagnée d'un commentaire court si son unité ou son intention n'est pas évidente ;
+- accompagnée d'un commentaire indiquant la justification de la valeur et un lien web vers la source ou référence externe ; exception : les fonctions pures dont le calcul est immédiatement évident n'ont pas besoin de source ;
 - exprimée dans les unités du modèle.
 
 Les fonctions de règles dans `src/data/` doivent rester **courtes : 20 lignes maximum**. Si une règle devient plus complexe, la découper en plusieurs fonctions nommées.
