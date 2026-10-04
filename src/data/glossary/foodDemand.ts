@@ -122,10 +122,8 @@ export function decidePurchases(
         for (const nutrientId of tier) {
           const need = needs[nutrientId as TierId];
           if (need <= 1e-9) continue;
-
           const supplied = contribution[nutrientId] ?? 0;
           if (supplied <= 0) continue;
-
           const nutrient = NUTRITION.find(item => item.id === nutrientId);
           if (!nutrient) continue;
 
@@ -136,11 +134,14 @@ export function decidePurchases(
               targetFor(nutrient, human.sex, human.state) *
                 human.metabolicFactor
             );
+        }
 
-          maxUsefulQuantity = Math.min(
-            maxUsefulQuantity,
-            need / supplied
-          );
+        for (const nutrient of NUTRITION) {
+          const need = needs[nutrient.id];
+          const supplied = contribution[nutrient.id] ?? 0;
+          if (need > 1e-9 && supplied > 0) {
+            maxUsefulQuantity = Math.min(maxUsefulQuantity, need / supplied);
+          }
         }
 
         if (
@@ -182,11 +183,10 @@ export function decidePurchases(
         bestOffer.name
       );
 
-      for (const nutrientId of tier) {
-        needs[nutrientId as TierId] = Math.max(
+      for (const nutrient of NUTRITION) {
+        needs[nutrient.id] = Math.max(
           0,
-          needs[nutrientId as TierId] -
-            (contribution[nutrientId] ?? 0)
+          needs[nutrient.id] - (contribution[nutrient.id] ?? 0)
         );
       }
     }
