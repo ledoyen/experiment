@@ -5,6 +5,7 @@ export interface ActivityDefinition {
   job: Exclude<Job, "idle">;
   labelKey: string;
   output: Good;
+  initialWorkerShare: number;
   annualCapacityPerWorker: number;
   annualOutputPerCapacity: number;
   capacityUnit: string;
@@ -24,25 +25,25 @@ export interface ActivityDefinition {
  * engrais minéral, pesticide ou sélection animale moderne.
  */
 export const ACTIVITIES: ActivityDefinition[] = [
-  { job: "agriculture_ble", labelKey: "job.agriculture_ble", output: "ble", annualCapacityPerWorker: 1, annualOutputPerCapacity: 1200, capacityUnit: "ha", competence: "agriculture" },
-  { job: "agriculture_pomme_de_terre", labelKey: "job.agriculture_pomme_de_terre", output: "pomme_de_terre", annualCapacityPerWorker: 0.25, annualOutputPerCapacity: 6000, capacityUnit: "ha", competence: "agriculture" },
-  { job: "agriculture_legumineuses", labelKey: "job.agriculture_legumineuses", output: "legumineuses", annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 700, capacityUnit: "ha", competence: "agriculture" },
-  { job: "horticulture_legumes", labelKey: "job.horticulture_legumes", output: "legumes", annualCapacityPerWorker: 0.1, annualOutputPerCapacity: 5000, capacityUnit: "ha", competence: "horticulture" },
-  { job: "arboriculture_fruits", labelKey: "job.arboriculture_fruits", output: "fruits", annualCapacityPerWorker: 0.3, annualOutputPerCapacity: 2000, capacityUnit: "ha", competence: "arboriculture" },
-  { job: "oliviculture", labelKey: "job.oliviculture", output: "huile_olive", annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 150, capacityUnit: "ha", competence: "arboriculture" },
-  { job: "élevage_lait", labelKey: "job.elevage_lait", output: "lait", annualCapacityPerWorker: 15, annualOutputPerCapacity: 600, capacityUnit: "vache", competence: "élevage" },
-  { job: "aviculture_oeufs", labelKey: "job.aviculture_oeufs", output: "oeufs", annualCapacityPerWorker: 100, annualOutputPerCapacity: 6, capacityUnit: "poule", competence: "élevage" },
-  { job: "pêche", labelKey: "job.peche", output: "poisson", annualCapacityPerWorker: 1, annualOutputPerCapacity: 500, capacityUnit: "pêcheur", competence: "pêche" },
-  { job: "chasse", labelKey: "job.chasse", output: "gibier", annualCapacityPerWorker: 0, annualOutputPerCapacity: 0, capacityUnit: "chasseur", competence: "chasse", dormant: true },
-  { job: "textile", labelKey: "job.textile", output: "vetement", annualCapacityPerWorker: 1, annualOutputPerCapacity: 100, capacityUnit: "artisan", competence: "artisanat" },
-  { job: "construction", labelKey: "job.construction", output: "logement", annualCapacityPerWorker: 1, annualOutputPerCapacity: 20, capacityUnit: "artisan", competence: "construction", dormant: true },
-  { job: "bois_chauffage", labelKey: "job.bois_chauffage", output: "chauffage", annualCapacityPerWorker: 1, annualOutputPerCapacity: 5, capacityUnit: "bûcheron", competence: "foresterie" },
-  { job: "outillage", labelKey: "job.outillage", output: "outil", annualCapacityPerWorker: 1, annualOutputPerCapacity: 50, capacityUnit: "artisan", competence: "artisanat" }
+  { job: "agriculture_ble", labelKey: "job.agriculture_ble", output: "ble", initialWorkerShare: 0.12, annualCapacityPerWorker: 1, annualOutputPerCapacity: 1200, capacityUnit: "ha", competence: "agriculture" },
+  { job: "agriculture_pomme_de_terre", labelKey: "job.agriculture_pomme_de_terre", output: "pomme_de_terre", initialWorkerShare: 0.08, annualCapacityPerWorker: 0.25, annualOutputPerCapacity: 6000, capacityUnit: "ha", competence: "agriculture" },
+  { job: "agriculture_legumineuses", labelKey: "job.agriculture_legumineuses", output: "legumineuses", initialWorkerShare: 0.06, annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 700, capacityUnit: "ha", competence: "agriculture" },
+  { job: "horticulture_legumes", labelKey: "job.horticulture_legumes", output: "legumes", initialWorkerShare: 0.05, annualCapacityPerWorker: 0.1, annualOutputPerCapacity: 5000, capacityUnit: "ha", competence: "horticulture" },
+  { job: "arboriculture_fruits", labelKey: "job.arboriculture_fruits", output: "fruits", initialWorkerShare: 0.04, annualCapacityPerWorker: 0.3, annualOutputPerCapacity: 2000, capacityUnit: "ha", competence: "arboriculture" },
+  { job: "oliviculture", labelKey: "job.oliviculture", output: "huile_olive", initialWorkerShare: 0.02, annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 150, capacityUnit: "ha", competence: "arboriculture" },
+  { job: "élevage_lait", labelKey: "job.elevage_lait", output: "lait", initialWorkerShare: 0.08, annualCapacityPerWorker: 15, annualOutputPerCapacity: 600, capacityUnit: "vache", competence: "élevage" },
+  { job: "aviculture_oeufs", labelKey: "job.aviculture_oeufs", output: "oeufs", initialWorkerShare: 0.04, annualCapacityPerWorker: 100, annualOutputPerCapacity: 6, capacityUnit: "poule", competence: "élevage" },
+  { job: "pêche", labelKey: "job.peche", output: "poisson", initialWorkerShare: 0.04, annualCapacityPerWorker: 1, annualOutputPerCapacity: 500, capacityUnit: "pêcheur", competence: "pêche" },
+  { job: "chasse", labelKey: "job.chasse", output: "gibier", initialWorkerShare: 0, annualCapacityPerWorker: 0, annualOutputPerCapacity: 0, capacityUnit: "chasseur", competence: "chasse", dormant: true },
+  { job: "textile", labelKey: "job.textile", output: "vetement", initialWorkerShare: 0.12, annualCapacityPerWorker: 1, annualOutputPerCapacity: 100, capacityUnit: "artisan", competence: "artisanat" },
+  { job: "construction", labelKey: "job.construction", output: "logement", initialWorkerShare: 0.05, annualCapacityPerWorker: 1, annualOutputPerCapacity: 20, capacityUnit: "artisan", competence: "construction", dormant: true },
+  { job: "bois_chauffage", labelKey: "job.bois_chauffage", output: "chauffage", initialWorkerShare: 0.14, annualCapacityPerWorker: 1, annualOutputPerCapacity: 5, capacityUnit: "bûcheron", competence: "foresterie" },
+  { job: "outillage", labelKey: "job.outillage", output: "outil", initialWorkerShare: 0.07, annualCapacityPerWorker: 1, annualOutputPerCapacity: 50, capacityUnit: "artisan", competence: "artisanat" }
 ];
 
-export const ACTIVE_REFERENCE_ETP = ACTIVITIES
+export const ACTIVE_WORKER_SHARE = ACTIVITIES
   .filter(activity => !activity.dormant)
-  .reduce((sum, activity) => sum + activity.annualCapacityPerWorker, 0);
+  .reduce((sum, activity) => sum + activity.initialWorkerShare, 0);
 
 export function annualOutputPerWorker(activity: ActivityDefinition): number {
   return activity.annualCapacityPerWorker * activity.annualOutputPerCapacity;
