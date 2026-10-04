@@ -56,7 +56,7 @@ export const DURABLE_FOOD_GOODS: Good[] = [
 ];
 
 // 90 days is a modelling starting point, deliberately finite: storage exists, but is not an unlimited buffer. Historical grain reserves are well documented. Source: https://www.fao.org/4/w4979e/w4979e04.htm
-export const INITIAL_DURABLE_FOOD_STOCK_DAYS = 90;
+export const INITIAL_DURABLE_FOOD_STOCK_DAYS = 180;
 
 // Pure bookkeeping conversion from annual production to an initial household reserve.
 export function initialFoodStockPerPerson(good: Good): number {
