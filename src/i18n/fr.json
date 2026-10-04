@@ -110,5 +110,7 @@
   "exportAnalysis": "Exporter les données d'analyse",
   "stock": "Stock",
   "noStock": "Aucun stock",
-  "foodAutonomy": "Autonomie alimentaire"
+  "foodAutonomy": "Autonomie alimentaire",
+  "physicalWealth": "Patrimoine physique",
+  "zeroMoneyWithoutFood": "Sans argent ni stock alimentaire"
 }
