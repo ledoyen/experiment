@@ -25,6 +25,7 @@ describe("simulation behavioral invariants", () => {
     });
 
     const populations = runDays(world, 30);
+    console.log("no-money populations", populations);
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(180);
   });
 
