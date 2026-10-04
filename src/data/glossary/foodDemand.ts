@@ -115,7 +115,7 @@ export function decidePurchases(
         const food = FOOD_NUTRITION[offer.name];
         if (!food) continue;
 
-        const contribution = foodToNutrition(food, 1);
+        const contribution = foodToNutrition(food, 1, offer.name);
         let benefit = 0;
         let maxUsefulQuantity = Number.POSITIVE_INFINITY;
 
@@ -178,7 +178,8 @@ export function decidePurchases(
 
       const contribution = foodToNutrition(
         FOOD_NUTRITION[bestOffer.name]!,
-        bestQuantity
+        bestQuantity,
+        bestOffer.name
       );
 
       for (const nutrientId of tier) {
@@ -284,7 +285,7 @@ function consumeAutonomyFood(
   const intake = {} as Partial<Record<typeof NUTRITION[number]["id"], number>>;
   for (const [good, quantity] of Object.entries(demand) as Array<[Good, number]>) {
     stock[good] = Math.max(0, (stock[good] ?? 0) - quantity);
-    const contribution = foodToNutrition(FOOD_NUTRITION[good]!, quantity);
+    const contribution = foodToNutrition(FOOD_NUTRITION[good]!, quantity, good);
     for (const nutrient of NUTRITION) intake[nutrient.id] = (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
   }
   return { reserves: applyNutritionDay(reserves, intake, sex, state, requirementFactor), stock };
