@@ -1,4 +1,4 @@
-import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerEtp } from "../data/economy";
+import { ACTIVITIES, ACTIVE_REFERENCE_ETP, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker } from "../data/economy";
 import { MAX_FOOD_PURCHASE_ROUNDS } from "../data/glossary/foodDemand";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
@@ -98,11 +98,11 @@ export class World {
     let assigned = 0;
 
     for (const activity of ACTIVITIES) {
-      if (activity.dormant || activity.referenceEtp <= 0) continue;
+      if (activity.dormant || activity.annualCapacityPerWorker <= 0) continue;
 
       const exact =
         this.parameters.population *
-        activity.referenceEtp /
+        activity.annualCapacityPerWorker /
         Math.max(ACTIVE_REFERENCE_ETP, 1);
 
       const count = Math.floor(exact);
@@ -434,7 +434,7 @@ export class World {
       if (!activity || activity.dormant) continue;
 
       const production =
-        dailyOutputPerEtp(activity) *
+        dailyOutputPerWorker(activity) *
         agent.productivity *
         seasonalProductionMultiplier(activity.job, simulationDay);
 
@@ -832,7 +832,7 @@ export class World {
       if (!activity || activity.dormant) return 0;
 
       const output =
-        dailyOutputPerEtp(activity) *
+        dailyOutputPerWorker(activity) *
         agent.productivity *
         seasonalProductionMultiplier(activity.job, simulationDay);
 
