@@ -250,16 +250,28 @@ export function estimateFoodAutonomyDays(
   let stock = { ...inventory };
   for (let day = 0; day < maxDays; day++) {
     const demand = planFoodDemand(current, sex, state, Number.POSITIVE_INFINITY, prices, stock, requirementFactor);
-    const quantities = Object.entries(demand) as Array<[Good, number]>;
-    if (!quantities.length) return day;
-    const intake = {} as Partial<Record<typeof NUTRITION[number]["id"], number>>;
-    for (const [good, quantity] of quantities) {
-      stock[good] = Math.max(0, (stock[good] ?? 0) - quantity);
-      const contribution = foodToNutrition(FOOD_NUTRITION[good]!, quantity);
-      for (const nutrient of NUTRITION) intake[nutrient.id] = (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
-    }
-    current = applyNutritionDay(current, intake, sex, state, requirementFactor);
+    if (!Object.keys(demand).length) return day;
+    const result = consumeAutonomyFood(current, stock, demand, sex, state, requirementFactor);
+    current = result.reserves;
+    stock = result.stock;
     if (current.energy.value <= 0) return day + 1;
   }
   return null;
+}
+
+function consumeAutonomyFood(
+  reserves: NutritionReserves,
+  stock: Partial<Record<Good, number>>,
+  demand: Record<Good, number>,
+  sex: Sex,
+  state: PhysiologyState,
+  requirementFactor: number
+) {
+  const intake = {} as Partial<Record<typeof NUTRITION[number]["id"], number>>;
+  for (const [good, quantity] of Object.entries(demand) as Array<[Good, number]>) {
+    stock[good] = Math.max(0, (stock[good] ?? 0) - quantity);
+    const contribution = foodToNutrition(FOOD_NUTRITION[good]!, quantity);
+    for (const nutrient of NUTRITION) intake[nutrient.id] = (intake[nutrient.id] ?? 0) + (contribution[nutrient.id] ?? 0);
+  }
+  return { reserves: applyNutritionDay(reserves, intake, sex, state, requirementFactor), stock };
 }
