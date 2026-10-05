@@ -239,8 +239,9 @@ export function isLethalNutritionState(
   reserves: NutritionReserves,
   deficitDays: Partial<Record<NutritionId, number>>
 ): boolean {
-  return NUTRITION.some(nutrient =>
-    NUTRITION_MORTALITY[nutrient.id].lethalAfterDays !== null &&
-    (deficitDays[nutrient.id] ?? 0) >= NUTRITION_MORTALITY[nutrient.id].lethalAfterDays
-  );
+  return NUTRITION.some(nutrient => {
+    const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;
+    return lethalAfterDays !== null &&
+      (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;
+  });
 }
