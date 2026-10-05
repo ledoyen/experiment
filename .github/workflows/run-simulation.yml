@@ -2,6 +2,8 @@ name: Run simulation
 
 on:
   workflow_dispatch:
+  issues:
+    types: [opened, edited]
     inputs:
       population:
         description: "Initial population"
@@ -46,6 +48,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   simulate:
@@ -62,19 +65,47 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run simulation
+      - name: Prepare simulation parameters
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          POPULATION: ${{ inputs.population }}
+          INITIAL_MONEY: ${{ inputs.initial_money }}
+          MONEY_ENABLED: ${{ inputs.money_enabled }}
+          MOBILITY: ${{ inputs.mobility }}
+          PRICE_SENSITIVITY: ${{ inputs.price_sensitivity }}
+          PRODUCTIVITY_VARIANCE: ${{ inputs.productivity_variance }}
+          MONEY_INTRODUCTION_DAY: ${{ inputs.money_introduction_day }}
+          DURATION_DAYS: ${{ inputs.duration_days }}
         run: |
-          npm run simulate -- \
-            --population "${{ inputs.population }}" \
-            --initial-money "${{ inputs.initial_money }}" \
-            --money-enabled "${{ inputs.money_enabled }}" \
-            --mobility "${{ inputs.mobility }}" \
-            --price-sensitivity "${{ inputs.price_sensitivity }}" \
-            --productivity-variance "${{ inputs.productivity_variance }}" \
-            --money-introduction-day "${{ inputs.money_introduction_day }}" \
-            --duration-days "${{ inputs.duration_days }}" \
-            --output simulation.csv
+          if [ "$GITHUB_EVENT_NAME" = "issues" ]; then
+            printf '%s' "$ISSUE_BODY" > simulation-parameters.json
+            jq -e 'type == "object" and (keys | sort) == ["duration_days","initial_money","mobility","money_enabled","money_introduction_day","population","price_sensitivity","productivity_variance"] and (.population | type == "number" and floor == . and . >= 1) and (.initial_money | type == "number") and (.money_enabled | type == "boolean") and (.mobility | type == "number") and (.price_sensitivity | type == "number") and (.productivity_variance | type == "number") and (.money_introduction_day | type == "number" or . == null) and (.duration_days | type == "number" and floor == . and . >= 0)' simulation-parameters.json >/dev/null
+            jq -r '"population=" + (.population|tostring) + "
+initial_money=" + (.initial_money|tostring) + "
+money_enabled=" + (.money_enabled|tostring) + "
+mobility=" + (.mobility|tostring) + "
+price_sensitivity=" + (.price_sensitivity|tostring) + "
+productivity_variance=" + (.productivity_variance|tostring) + "
+money_introduction_day=" + (if .money_introduction_day == null then "" else (.money_introduction_day|tostring) end) + "
+duration_days=" + (.duration_days|tostring)' simulation-parameters.json >> "$GITHUB_ENV"
+          else
+            {
+              echo "population=$POPULATION"
+              echo "initial_money=$INITIAL_MONEY"
+              echo "money_enabled=$MONEY_ENABLED"
+              echo "mobility=$MOBILITY"
+              echo "price_sensitivity=$PRICE_SENSITIVITY"
+              echo "productivity_variance=$PRODUCTIVITY_VARIANCE"
+              echo "money_introduction_day=$MONEY_INTRODUCTION_DAY"
+              echo "duration_days=$DURATION_DAYS"
+            } >> "$GITHUB_ENV"
+          fi
 
+      - name: Run simulation
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
+        run: |
+          npm run simulate --             --population "$population"             --initial-money "$initial_money"             --money-enabled "$money_enabled"             --mobility "$mobility"             --price-sensitivity "$price_sensitivity"             --productivity-variance "$productivity_variance"             --money-introduction-day "$money_introduction_day"             --duration-days "$duration_days"             --output simulation.csv
       - name: Upload simulation CSV
         uses: actions/upload-artifact@v4
         with:
