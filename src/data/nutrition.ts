@@ -19,7 +19,7 @@ export interface NutritionDefinition {
 
 export interface NutritionMortalityRule {
   criticalReserveDays: number;
-  lethalAfterDays: number;
+  lethalAfterDays: number | null;
 }
 
 // These are intentionally conservative simulation thresholds, not clinical diagnostic cut-offs.
@@ -30,28 +30,27 @@ export interface NutritionMortalityRule {
 // https://www.who.int/docs/default-source/micronutrients/9789241596107-annex1.pdf
 export const NUTRITION_MORTALITY: Record<NutritionId, NutritionMortalityRule> = {
   energy: { criticalReserveDays: 0.5, lethalAfterDays: 2 },
-  protein: { criticalReserveDays: 1, lethalAfterDays: 21 },
-  carbohydrate: { criticalReserveDays: 1, lethalAfterDays: 21 },
-  fat: { criticalReserveDays: 1, lethalAfterDays: 30 },
-  fiber: { criticalReserveDays: 1, lethalAfterDays: 60 },
-  vitamin_A: { criticalReserveDays: 1, lethalAfterDays: 180 },
-  vitamin_B1: { criticalReserveDays: 1, lethalAfterDays: 60 },
-  vitamin_B2: { criticalReserveDays: 1, lethalAfterDays: 180 },
-  vitamin_B3: { criticalReserveDays: 1, lethalAfterDays: 60 },
-  vitamin_B6: { criticalReserveDays: 1, lethalAfterDays: 180 },
-  vitamin_B9: { criticalReserveDays: 1, lethalAfterDays: 120 },
-  vitamin_B12: { criticalReserveDays: 1, lethalAfterDays: 365 },
-  vitamin_C: { criticalReserveDays: 1, lethalAfterDays: 45 },
-  vitamin_E: { criticalReserveDays: 1, lethalAfterDays: 365 },
-  vitamin_K: { criticalReserveDays: 1, lethalAfterDays: 90 },
-  calcium: { criticalReserveDays: 1, lethalAfterDays: 365 },
-  iron: { criticalReserveDays: 1, lethalAfterDays: 180 },
-  magnesium: { criticalReserveDays: 1, lethalAfterDays: 60 },
-  zinc: { criticalReserveDays: 1, lethalAfterDays: 180 },
-  iodine: { criticalReserveDays: 1, lethalAfterDays: 180 },
-  selenium: { criticalReserveDays: 1, lethalAfterDays: 365 }
+  protein: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  carbohydrate: { criticalReserveDays: 1, lethalAfterDays: null },
+  fat: { criticalReserveDays: 1, lethalAfterDays: null },
+  fiber: { criticalReserveDays: 1, lethalAfterDays: null },
+  vitamin_A: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_B1: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  vitamin_B2: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_B3: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_B6: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_B9: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_B12: { criticalReserveDays: 1, lethalAfterDays: 1825 },
+  vitamin_C: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  vitamin_E: { criticalReserveDays: 1, lethalAfterDays: 730 },
+  vitamin_K: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  calcium: { criticalReserveDays: 1, lethalAfterDays: 730 },
+  iron: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  magnesium: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  zinc: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  iodine: { criticalReserveDays: 1, lethalAfterDays: 730 },
+  selenium: { criticalReserveDays: 1, lethalAfterDays: 730 }
 };
-
 export interface NutritionReserve {
   value: number;
   max: number;
@@ -241,6 +240,7 @@ export function isLethalNutritionState(
   deficitDays: Partial<Record<NutritionId, number>>
 ): boolean {
   return NUTRITION.some(nutrient =>
+    NUTRITION_MORTALITY[nutrient.id].lethalAfterDays !== null &&
     (deficitDays[nutrient.id] ?? 0) >= NUTRITION_MORTALITY[nutrient.id].lethalAfterDays
   );
 }
