@@ -2,8 +2,6 @@ name: Run simulation
 
 on:
   workflow_dispatch:
-  issues:
-    types: [opened, edited]
     inputs:
       population:
         description: "Initial population"
@@ -45,6 +43,8 @@ on:
         required: true
         default: "365"
         type: string
+  issues:
+    types: [opened, edited]
 
 permissions:
   contents: read
@@ -58,6 +58,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -81,14 +86,7 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "issues" ]; then
             printf '%s' "$ISSUE_BODY" > simulation-parameters.json
             jq -e 'type == "object" and (keys | sort) == ["duration_days","initial_money","mobility","money_enabled","money_introduction_day","population","price_sensitivity","productivity_variance"] and (.population | type == "number" and floor == . and . >= 1) and (.initial_money | type == "number") and (.money_enabled | type == "boolean") and (.mobility | type == "number") and (.price_sensitivity | type == "number") and (.productivity_variance | type == "number") and (.money_introduction_day | type == "number" or . == null) and (.duration_days | type == "number" and floor == . and . >= 0)' simulation-parameters.json >/dev/null
-            jq -r '"population=" + (.population|tostring) + "
-initial_money=" + (.initial_money|tostring) + "
-money_enabled=" + (.money_enabled|tostring) + "
-mobility=" + (.mobility|tostring) + "
-price_sensitivity=" + (.price_sensitivity|tostring) + "
-productivity_variance=" + (.productivity_variance|tostring) + "
-money_introduction_day=" + (if .money_introduction_day == null then "" else (.money_introduction_day|tostring) end) + "
-duration_days=" + (.duration_days|tostring)' simulation-parameters.json >> "$GITHUB_ENV"
+            jq -r '"population=" + (.population|tostring) + "\ninitial_money=" + (.initial_money|tostring) + "\nmoney_enabled=" + (.money_enabled|tostring) + "\nmobility=" + (.mobility|tostring) + "\nprice_sensitivity=" + (.price_sensitivity|tostring) + "\nproductivity_variance=" + (.productivity_variance|tostring) + "\nmoney_introduction_day=" + (if .money_introduction_day == null then "" else (.money_introduction_day|tostring) end) + "\nduration_days=" + (.duration_days|tostring)' simulation-parameters.json >> "$GITHUB_ENV"
           else
             {
               echo "population=$POPULATION"
@@ -105,8 +103,19 @@ duration_days=" + (.duration_days|tostring)' simulation-parameters.json >> "$GIT
       - name: Run simulation
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
         run: |
-          npm run simulate --             --population "$population"             --initial-money "$initial_money"             --money-enabled "$money_enabled"             --mobility "$mobility"             --price-sensitivity "$price_sensitivity"             --productivity-variance "$productivity_variance"             --money-introduction-day "$money_introduction_day"             --duration-days "$duration_days"             --output simulation.csv
+          npm run simulate -- \
+            --population "$population" \
+            --initial-money "$initial_money" \
+            --money-enabled "$money_enabled" \
+            --mobility "$mobility" \
+            --price-sensitivity "$price_sensitivity" \
+            --productivity-variance "$productivity_variance" \
+            --money-introduction-day "$money_introduction_day" \
+            --duration-days "$duration_days" \
+            --output simulation.csv
+
       - name: Upload simulation CSV
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
         uses: actions/upload-artifact@v4
         with:
           name: simulation-csv
