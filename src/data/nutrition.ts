@@ -17,6 +17,41 @@ export interface NutritionDefinition {
   lactation?: number;
 }
 
+export interface NutritionMortalityRule {
+  criticalReserveDays: number;
+  lethalAfterDays: number;
+}
+
+// These are intentionally conservative simulation thresholds, not clinical diagnostic cut-offs.
+// They represent the point where the model considers the remaining physiological reserve critically low.
+// The durations reflect the very different time scales of acute starvation and micronutrient depletion.
+// Vitamin C deficiency can produce scurvy within about one month of very low intake; iron deficiency
+// progresses through depleted stores before anaemia. Sources: https://ods.od.nih.gov/factsheets/VitaminC-HealthProfessional/
+// https://www.who.int/docs/default-source/micronutrients/9789241596107-annex1.pdf
+export const NUTRITION_MORTALITY: Record<NutritionId, NutritionMortalityRule> = {
+  energy: { criticalReserveDays: 0.5, lethalAfterDays: 2 },
+  protein: { criticalReserveDays: 1, lethalAfterDays: 21 },
+  carbohydrate: { criticalReserveDays: 1, lethalAfterDays: 21 },
+  fat: { criticalReserveDays: 1, lethalAfterDays: 30 },
+  fiber: { criticalReserveDays: 1, lethalAfterDays: 60 },
+  vitamin_A: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  vitamin_B1: { criticalReserveDays: 1, lethalAfterDays: 60 },
+  vitamin_B2: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  vitamin_B3: { criticalReserveDays: 1, lethalAfterDays: 60 },
+  vitamin_B6: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  vitamin_B9: { criticalReserveDays: 1, lethalAfterDays: 120 },
+  vitamin_B12: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_C: { criticalReserveDays: 1, lethalAfterDays: 45 },
+  vitamin_E: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  vitamin_K: { criticalReserveDays: 1, lethalAfterDays: 90 },
+  calcium: { criticalReserveDays: 1, lethalAfterDays: 365 },
+  iron: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  magnesium: { criticalReserveDays: 1, lethalAfterDays: 60 },
+  zinc: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  iodine: { criticalReserveDays: 1, lethalAfterDays: 180 },
+  selenium: { criticalReserveDays: 1, lethalAfterDays: 365 }
+};
+
 export interface NutritionReserve {
   value: number;
   max: number;
@@ -185,8 +220,27 @@ export function foodToNutrition(food: FoodNutrition, quantity: number, good?: Go
 
 
 /** Zero is the simulation death boundary, not a medical threshold. */
-export const MINIMUM_SURVIVABLE_ENERGY_RESERVE_KCAL = 0;
+// A reserve below its critical threshold is not immediate death. It becomes lethal only
+// when the individual remains below that threshold for the nutrient's defined duration.
+export function updateNutritionDeficitDays(
+  reserves: NutritionReserves,
+  previousDeficitDays: Partial<Record<NutritionId, number>>
+): Partial<Record<NutritionId, number>> {
+  return Object.fromEntries(
+    NUTRITION.map(nutrient => {
+      const rule = NUTRITION_MORTALITY[nutrient.id];
+      const criticalReserve = nutrient.target.male * rule.criticalReserveDays;
+      const days = previousDeficitDays[nutrient.id] ?? 0;
+      return [nutrient.id, reserves[nutrient.id].value < criticalReserve ? days + 1 : 0];
+    })
+  );
+}
 
-export function isLethalNutritionState(reserves: NutritionReserves): boolean {
-  return reserves.energy.value <= MINIMUM_SURVIVABLE_ENERGY_RESERVE_KCAL;
+export function isLethalNutritionState(
+  reserves: NutritionReserves,
+  deficitDays: Partial<Record<NutritionId, number>>
+): boolean {
+  return NUTRITION.some(nutrient =>
+    (deficitDays[nutrient.id] ?? 0) >= NUTRITION_MORTALITY[nutrient.id].lethalAfterDays
+  );
 }
