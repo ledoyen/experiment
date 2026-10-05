@@ -1,0 +1,74 @@
+name: Run simulation
+
+on:
+  workflow_dispatch:
+    inputs:
+      population:
+        description: "Initial population"
+        required: true
+        default: "200"
+        type: string
+      initial_money:
+        description: "Initial money per individual"
+        required: true
+        default: "100"
+        type: string
+      money_enabled:
+        description: "Money enabled from the start"
+        required: true
+        default: false
+        type: boolean
+      mobility:
+        description: "Job mobility parameter"
+        required: true
+        default: "0.2"
+        type: string
+      price_sensitivity:
+        description: "Price sensitivity parameter"
+        required: true
+        default: "0.15"
+        type: string
+      productivity_variance:
+        description: "Productivity variance parameter"
+        required: true
+        default: "0.2"
+        type: string
+      money_introduction_day:
+        description: "Day to introduce money; leave empty for no introduction"
+        required: false
+        default: ""
+        type: string
+      duration_days:
+        description: "Simulation duration in days"
+        required: true
+        default: "365"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run simulation
+        run: |
+          npm run simulate --             --population "${{ inputs.population }}"             --initial-money "${{ inputs.initial_money }}"             --money-enabled "${{ inputs.money_enabled }}"             --mobility "${{ inputs.mobility }}"             --price-sensitivity "${{ inputs.price_sensitivity }}"             --productivity-variance "${{ inputs.productivity_variance }}"             --money-introduction-day "${{ inputs.money_introduction_day }}"             --duration-days "${{ inputs.duration_days }}"             --output simulation.csv
+
+      - name: Upload simulation CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-csv
+          path: simulation.csv
+          if-no-files-found: error
