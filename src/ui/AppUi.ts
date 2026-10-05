@@ -1,13 +1,13 @@
 import type { Parameters, Metrics, Agent, AgentEvent, Good, Job } from "../data/types";
 import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
-import { FOOD_NUTRITION, NUTRITION, type NutritionId } from "../data/nutrition";
+import { NUTRITION, type NutritionId } from "../data/nutrition";
 import { chartTimeResolution, simulationTimeParts, estimateFoodAutonomyDays } from "../data/glossary";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 import { buildAnalysisCsv } from "../analysis/buildAnalysisCsv";
 
-type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population" | "physicalWealth" | "zeroMoneyWithoutFood" | "foodStock";
+type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population" | "physicalWealth" | "zeroMoneyWithoutFood" | "physiologicalReserve";
 type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}` | `stock:${Good}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
@@ -18,7 +18,7 @@ const SERIES_COLORS: Record<string, string> = {
   population: "#ff9f68",
   physicalWealth: "#8dd3c7",
   zeroMoneyWithoutFood: "#fb8072",
-  foodStock: "#b3de69"
+  physiologicalReserve: "#b3de69"
 };
 
 const PRICE_CURRENCY_SYMBOL = "🪙";
@@ -50,7 +50,7 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key.startsWith("stock:")) return point.stocks[key.slice(6) as Good] ?? 0;
   if (key === "physicalWealth") return point.physicalWealth;
   if (key === "zeroMoneyWithoutFood") return point.zeroMoneyWithoutFoodCount;
-  if (key === "foodStock") return Object.entries(point.stocks).reduce((sum, [good, quantity]) => sum + quantity * (FOOD_NUTRITION[good as Good]?.kcal ?? 0), 0);
+  if (key === "physiologicalReserve") return point.physiologicalReserveRatio * 100;
   return Number(point[key as Exclude<BaseSeriesKey, "physicalWealth" | "zeroMoneyWithoutFood">]);
 }
 
@@ -62,13 +62,13 @@ function seriesLabel(key: SeriesKey): string {
   }
   if (key.startsWith("job:")) return t("job." + key.slice(4));
   if (key.startsWith("stock:")) return t("stock") + " — " + t("good." + key.slice(6));
-  if (key === "foodStock") return t("foodStock");
+  if (key === "physiologicalReserve") return t("physiologicalReserve");
   return t(key);
 }
 
 function seriesUnit(key: SeriesKey): string {
   if (key.startsWith("price:")) return PRICE_CURRENCY_SYMBOL + " / " + GOOD_PRICE_UNIT[key.slice(6) as Good];
-  if (key === "foodStock") return "kcal";
+  if (key === "physiologicalReserve") return "%";
   return "";
 }
 
@@ -136,7 +136,7 @@ export class AppUi {
           ${this.check("population", "livingPopulation")}
           ${this.check("physicalWealth", "physicalWealth")}
           ${this.check("zeroMoneyWithoutFood", "zeroMoneyWithoutFood")}
-          ${this.check("foodStock", "foodStock")}
+          ${this.check("physiologicalReserve", "physiologicalReserve")}
           ${this.check("price:ble", "good.ble")}
         </div>
         <details class="price-choices">
