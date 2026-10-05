@@ -1017,6 +1017,13 @@ const population = Math.max(1, this.agents.length);
       }
     }
 
+    for (const agent of this.agents) {
+      agent.nutritionDeficitDays = updateNutritionDeficitDays(
+        agent.reserves,
+        agent.nutritionDeficitDays
+      );
+    }
+
     // Remove consumed food from commodity stocks proportionally.
     for (const good of FOOD_GOODS) {
       const sold = plans.reduce(
