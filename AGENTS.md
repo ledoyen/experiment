@@ -51,3 +51,25 @@ Pour lancer une expérience sans argent, laisser `money-introduction-day` vide. 
 Le workflow `.github/workflows/run-simulation.yml` est déclenché manuellement avec **Run workflow**. Il expose tous les paramètres initiaux, la durée et le jour d'introduction de l'argent. La vitesse n'est pas un paramètre : la CLI avance directement d'une journée à l'autre, sans rendu graphique. À la fin, `simulation.csv` contient l'historique agrégé et `simulation-final-agents.csv` contient l'état final de chaque individu, avec ses stocks, réserves physiologiques et compteurs de déficit. Les deux fichiers sont disponibles dans le même artefact GitHub Actions téléchargeable.
 
 Pour une itération de recherche, privilégier ce workflow et l'analyse du CSV plutôt que d'ajouter du code temporaire ou des paramètres de diagnostic au modèle.
+
+
+### Déclenchement par issue
+
+Le workflow `.github/workflows/run-simulation.yml` peut aussi être déclenché par la création ou la modification d'une issue. Pour éviter qu'une issue ordinaire lance une simulation, ce mode n'est accepté que si l'auteur de l'issue est **`ledoyen`**.
+
+Dans ce cas, le corps de l'issue doit être **exactement un objet JSON** contenant les huit paramètres suivants, sans champ supplémentaire :
+
+```json
+{
+  "population": 200,
+  "initial_money": 100,
+  "money_enabled": false,
+  "mobility": 0.2,
+  "price_sensitivity": 0.15,
+  "productivity_variance": 0.2,
+  "money_introduction_day": null,
+  "duration_days": 1000
+}
+```
+
+`money_introduction_day: null` signifie aucune introduction. Le workflow valide la structure et les types avant de lancer la simulation. Pour relancer une expérience, modifier le corps de la même issue : l'événement `edited` relancera alors le workflow.
