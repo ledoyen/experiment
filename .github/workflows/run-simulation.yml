@@ -1,6 +1,7 @@
 name: Run simulation
 
 on:
+  push:
   workflow_dispatch:
     inputs:
       population:
