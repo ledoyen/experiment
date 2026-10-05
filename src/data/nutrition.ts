@@ -229,7 +229,7 @@ export function updateNutritionDeficitDays(
   return Object.fromEntries(
     NUTRITION.map(nutrient => {
       const rule = NUTRITION_MORTALITY[nutrient.id];
-      const criticalReserve = nutrient.target.male * rule.criticalReserveDays;
+      const criticalReserve = (reserves[nutrient.id].max / nutrient.maxDays) * rule.criticalReserveDays;
       const days = previousDeficitDays[nutrient.id] ?? 0;
       return [nutrient.id, reserves[nutrient.id].value < criticalReserve ? days + 1 : 0];
     })
