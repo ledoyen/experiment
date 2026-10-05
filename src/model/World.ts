@@ -148,6 +148,7 @@ export class World {
         sex: id % 2 === 0 ? "male" : "female",
         state: "normal",
         metabolicFactor,
+        nutritionDeficitDays: {},
         reserves: createNutritionReserves(
           id % 2 === 0 ? "male" : "female",
           "normal",
