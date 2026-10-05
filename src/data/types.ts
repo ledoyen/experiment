@@ -67,6 +67,7 @@ export interface Human {
 
   // An individual's complete economic/physiological state.
   reserves: NutritionReserves;
+  nutritionDeficitDays: Partial<Record<NutritionId, number>>;
   sex: Sex;
   state: PhysiologyState;
   metabolicFactor: number;
