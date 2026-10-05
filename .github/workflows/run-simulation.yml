@@ -52,10 +52,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: 24
 
@@ -64,11 +64,22 @@ jobs:
 
       - name: Run simulation
         run: |
-          npm run simulate --             --population "${{ inputs.population }}"             --initial-money "${{ inputs.initial_money }}"             --money-enabled "${{ inputs.money_enabled }}"             --mobility "${{ inputs.mobility }}"             --price-sensitivity "${{ inputs.price_sensitivity }}"             --productivity-variance "${{ inputs.productivity_variance }}"             --money-introduction-day "${{ inputs.money_introduction_day }}"             --duration-days "${{ inputs.duration_days }}"             --output simulation.csv
+          npm run simulate -- \
+            --population "${{ inputs.population }}" \
+            --initial-money "${{ inputs.initial_money }}" \
+            --money-enabled "${{ inputs.money_enabled }}" \
+            --mobility "${{ inputs.mobility }}" \
+            --price-sensitivity "${{ inputs.price_sensitivity }}" \
+            --productivity-variance "${{ inputs.productivity_variance }}" \
+            --money-introduction-day "${{ inputs.money_introduction_day }}" \
+            --duration-days "${{ inputs.duration_days }}" \
+            --output simulation.csv
 
       - name: Upload simulation CSV
         uses: actions/upload-artifact@v4
         with:
           name: simulation-csv
-          path: |\n            simulation.csv\n            simulation-final-agents.csv
+          path: |
+            simulation.csv
+            simulation-final-agents.csv
           if-no-files-found: error
