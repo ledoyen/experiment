@@ -1,13 +1,13 @@
 import type { Parameters, Metrics, Agent, AgentEvent, Good, Job } from "../data/types";
 import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
-import { NUTRITION, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, NUTRITION, type NutritionId } from "../data/nutrition";
 import { chartTimeResolution, simulationTimeParts, estimateFoodAutonomyDays } from "../data/glossary";
 import { t } from "../i18n";
 import { World } from "../model/World";
 import { GameView } from "../render/GameView";
 import { buildAnalysisCsv } from "../analysis/buildAnalysisCsv";
 
-type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population" | "physicalWealth" | "zeroMoneyWithoutFood";
+type BaseSeriesKey = "medianWealth" | "gini" | "moneySupply" | "population" | "physicalWealth" | "zeroMoneyWithoutFood" | "foodStock";
 type SeriesKey = BaseSeriesKey | `price:${Good}` | `job:${Job}` | `stock:${Good}`;
 type HistogramKey = "wealthBins" | "productivityBins";
 
@@ -17,7 +17,8 @@ const SERIES_COLORS: Record<string, string> = {
   moneySupply: "#d1d5db",
   population: "#ff9f68",
   physicalWealth: "#8dd3c7",
-  zeroMoneyWithoutFood: "#fb8072"
+  zeroMoneyWithoutFood: "#fb8072",
+  foodStock: "#b3de69"
 };
 
 const PRICE_CURRENCY_SYMBOL = "🪙";
@@ -49,6 +50,7 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key.startsWith("stock:")) return point.stocks[key.slice(6) as Good] ?? 0;
   if (key === "physicalWealth") return point.physicalWealth;
   if (key === "zeroMoneyWithoutFood") return point.zeroMoneyWithoutFoodCount;
+  if (key === "foodStock") return Object.entries(point.stocks).reduce((sum, [good, quantity]) => sum + quantity * (FOOD_NUTRITION[good as Good]?.kcal ?? 0), 0);
   return Number(point[key as Exclude<BaseSeriesKey, "physicalWealth" | "zeroMoneyWithoutFood">]);
 }
 
@@ -60,13 +62,14 @@ function seriesLabel(key: SeriesKey): string {
   }
   if (key.startsWith("job:")) return t("job." + key.slice(4));
   if (key.startsWith("stock:")) return t("stock") + " — " + t("good." + key.slice(6));
+  if (key === "foodStock") return t("foodStock");
   return t(key);
 }
 
 function seriesUnit(key: SeriesKey): string {
-  return key.startsWith("price:")
-    ? PRICE_CURRENCY_SYMBOL + " / " + GOOD_PRICE_UNIT[key.slice(6) as Good]
-    : "";
+  if (key.startsWith("price:")) return PRICE_CURRENCY_SYMBOL + " / " + GOOD_PRICE_UNIT[key.slice(6) as Good];
+  if (key === "foodStock") return "kcal";
+  return "";
 }
 
 const formatValue = (value: number) => {
@@ -93,7 +96,7 @@ export class AppUi {
   private readonly ui: HTMLDivElement;
   private running = true;
   private speed = 1;
-  private series = new Set<SeriesKey>(["medianWealth", "gini", "moneySupply", "population", "price:ble"]);
+  private series = new Set<SeriesKey>(["population"]);
   private histogram: HistogramKey = "wealthBins";
   private hoverX: number | null = null;
   private histogramHoverX: number | null = null;
@@ -133,6 +136,7 @@ export class AppUi {
           ${this.check("population", "livingPopulation")}
           ${this.check("physicalWealth", "physicalWealth")}
           ${this.check("zeroMoneyWithoutFood", "zeroMoneyWithoutFood")}
+          ${this.check("foodStock", "foodStock")}
           ${this.check("price:ble", "good.ble")}
         </div>
         <details class="price-choices">
