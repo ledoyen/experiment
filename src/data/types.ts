@@ -99,6 +99,7 @@ export interface Metrics {
   zeroMoneyCount: number;
   zeroMoneyWithFoodCount: number;
   zeroMoneyWithoutFoodCount: number;
+  physiologicalReserveRatio: number;
   physicalWealth: number;
   productivityBins: number[];
   productivityBinSums: number[];
