@@ -251,6 +251,7 @@ export class World {
     const wealthTotal = wealth.reduce((sum, value) => sum + value, 0);
     const jobCounts = this.getJobCounts();
     const stocks = this.getStockTotals();
+    const physiologicalReserveRatio = this.getAveragePhysiologicalReserveRatio();
     const zeroMoney = this.agents.filter(agent => agent.money <= 1e-9);
     const zeroMoneyWithFood = zeroMoney.filter(agent =>
       FOOD_GOODS.some(good => (agent.inventory[good] ?? 0) > 1e-9)
@@ -279,6 +280,7 @@ export class World {
       zeroMoneyCount: zeroMoney.length,
       zeroMoneyWithFoodCount: zeroMoneyWithFood.length,
       zeroMoneyWithoutFoodCount: zeroMoney.length - zeroMoneyWithFood.length,
+      physiologicalReserveRatio,
       physicalWealth,
       productivityBins: productivityDistribution.counts,
       productivityBinSums: productivityDistribution.sums,
@@ -287,6 +289,18 @@ export class World {
       productivityMax: productivity.length ? Math.max(...productivity) : 0,
       jobCounts
     };
+  }
+
+  private getAveragePhysiologicalReserveRatio(): number {
+    if (!this.agents.length) return 0;
+    let total = 0;
+    for (const agent of this.agents) {
+      for (const nutrient of NUTRITION) {
+        const reserve = agent.reserves[nutrient.id];
+        total += reserve.max > 0 ? reserve.value / reserve.max : 0;
+      }
+    }
+    return total / (this.agents.length * NUTRITION.length);
   }
 
   getHistory() { return [...this.history]; }
