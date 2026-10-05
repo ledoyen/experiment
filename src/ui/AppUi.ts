@@ -51,7 +51,7 @@ function seriesValue(point: Metrics, key: SeriesKey): number {
   if (key === "physicalWealth") return point.physicalWealth;
   if (key === "zeroMoneyWithoutFood") return point.zeroMoneyWithoutFoodCount;
   if (key === "physiologicalReserve") return point.physiologicalReserveRatio * 100;
-  return Number(point[key as Exclude<BaseSeriesKey, "physicalWealth" | "zeroMoneyWithoutFood">]);
+  return Number(point[key as Exclude<BaseSeriesKey, "physicalWealth" | "zeroMoneyWithoutFood" | "physiologicalReserve">]);
 }
 
 function seriesLabel(key: SeriesKey): string {
