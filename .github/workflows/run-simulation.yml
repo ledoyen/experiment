@@ -70,5 +70,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: simulation-csv
-          path: simulation.csv
+          path: |\n            simulation.csv\n            simulation-final-agents.csv
           if-no-files-found: error

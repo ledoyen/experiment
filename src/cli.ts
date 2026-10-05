@@ -1,7 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { buildAnalysisCsv } from "./analysis/buildAnalysisCsv";
+import { buildFinalAgentsCsv } from "./analysis/buildFinalAgentsCsv";
 import { defaultParameters } from "./data/defaults";
-import type { Parameters } from "./data/types";
+import type { Good, Parameters } from "./data/types";
 import { World } from "./model/World";
 
 const MINUTES_PER_DAY = 1440;
@@ -109,10 +110,20 @@ function run(options: CliOptions): void {
   );
   writeFileSync(options.output, csv, "utf8");
 
+  const finalAgentsOutput = options.output.endsWith(".csv")
+    ? options.output.replace(/\.csv$/i, "-final-agents.csv")
+    : `${options.output}-final-agents.csv`;
+  const goods = Object.keys(world.prices) as Good[];
+  writeFileSync(
+    finalAgentsOutput,
+    buildFinalAgentsCsv(world.agents, goods, options.durationDays),
+    "utf8"
+  );
+
   const metrics = world.getMetrics();
   console.log(
     `Simulation finished: day ${options.durationDays}, population ${metrics.population}, ` +
-    `money ${metrics.moneySupply}, output ${options.output}`
+    `money ${metrics.moneySupply}, outputs ${options.output} and ${finalAgentsOutput}`
   );
 }
 

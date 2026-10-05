@@ -48,6 +48,6 @@ Les six paramètres initiaux correspondent aux valeurs de `defaultParameters()` 
 
 Pour lancer une expérience sans argent, laisser `money-introduction-day` vide. Pour introduire l'argent au début d'un jour donné, mettre par exemple `178`. `money-enabled=true` signifie que l'argent est actif dès le début ; il ne doit pas être combiné avec une date d'introduction.
 
-Le workflow `.github/workflows/run-simulation.yml` est déclenché manuellement avec **Run workflow**. Il expose tous les paramètres initiaux, la durée et le jour d'introduction de l'argent. La vitesse n'est pas un paramètre : la CLI avance directement d'une journée à l'autre, sans rendu graphique. À la fin, le fichier `simulation.csv` est disponible comme artefact GitHub Actions téléchargeable.
+Le workflow `.github/workflows/run-simulation.yml` est déclenché manuellement avec **Run workflow**. Il expose tous les paramètres initiaux, la durée et le jour d'introduction de l'argent. La vitesse n'est pas un paramètre : la CLI avance directement d'une journée à l'autre, sans rendu graphique. À la fin, `simulation.csv` contient l'historique agrégé et `simulation-final-agents.csv` contient l'état final de chaque individu, avec ses stocks, réserves physiologiques et compteurs de déficit. Les deux fichiers sont disponibles dans le même artefact GitHub Actions téléchargeable.
 
 Pour une itération de recherche, privilégier ce workflow et l'analyse du CSV plutôt que d'ajouter du code temporaire ou des paramètres de diagnostic au modèle.
