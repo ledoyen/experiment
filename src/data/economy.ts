@@ -138,6 +138,29 @@ export const GOOD_PRICE_UNIT: Record<Good, string> = {
   logement: "m²"
 };
 
+
+// Historical reference for a preindustrial society: in France in 1789, 67% of the
+// population lived in agricultural households. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
+export const COLLECTIVE_FOOD_WORKER_SHARE = 0.67;
+
+// Purely ranks food-producing jobs by physical shortage per worker of output.
+// No monetary signal or arbitrary productivity coefficient is involved.
+export function rankFoodJobsByShortage(
+  demand: Partial<Record<Good, number>>,
+  stock: Partial<Record<Good, number>>
+): Job[] {
+  return ACTIVITIES
+    .filter(activity => !activity.dormant && FOOD_GOODS.includes(activity.output))
+    .map(activity => ({
+      job: activity.job,
+      shortage: Math.max(0, (demand[activity.output] ?? 0) - (stock[activity.output] ?? 0)),
+      output: dailyOutputPerWorker(activity)
+    }))
+    .filter(item => item.output > 0 && item.shortage > 0)
+    .sort((a, b) => b.shortage / b.output - a.shortage / a.output)
+    .map(item => item.job);
+}
+
 export const FOOD_GOODS: Good[] = [
   "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
   "huile_olive", "lait", "oeufs", "volaille", "porc", "poisson", "gibier"
