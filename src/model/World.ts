@@ -18,6 +18,7 @@ import {
   linearDistributionBins,
   planFoodDemand,
   decidePurchases,
+  MAX_FOOD_PURCHASE_ROUNDS,
 
   MAX_STORED_FOOD_DAYS_FOR_PRICE
 } from "../data/glossary";
