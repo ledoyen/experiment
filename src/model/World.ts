@@ -18,6 +18,7 @@ import {
   linearDistributionBins,
   planFoodDemand,
   decidePurchases,
+  MAX_FOOD_PURCHASE_ROUNDS,
 
   MAX_STORED_FOOD_DAYS_FOR_PRICE
 } from "../data/glossary";
@@ -652,7 +653,7 @@ export class World {
       }
     };
 
-    while (true) {
+    for (let round = 0; round < MAX_FOOD_PURCHASE_ROUNDS; round++) {
       const requestsByHuman = new Map<
         number,
         ReturnType<typeof decidePurchases>
