@@ -1,4 +1,5 @@
 import type { Good, Job } from "./types";
+import { FOOD_NUTRITION, foodToNutrition, type NutritionId } from "./nutrition";
 import { initialPriceScale } from "./glossary/nutritionCost";
 
 export interface ActivityDefinition {
@@ -145,20 +146,35 @@ export const COLLECTIVE_FOOD_WORKER_SHARE = 0.67;
 
 // Purely ranks food-producing jobs by physical shortage per worker of output.
 // No monetary signal or arbitrary productivity coefficient is involved.
-export function rankFoodJobsByShortage(
-  demand: Partial<Record<Good, number>>,
-  stock: Partial<Record<Good, number>>
+export function rankFoodJobsByNutrientShortage(
+  demand: Partial<Record<NutritionId, number>>,
+  stock: Partial<Record<NutritionId, number>>
 ): Job[] {
+  const nutrient = Object.keys(demand)
+    .filter(id => (demand[id as NutritionId] ?? 0) > 0)
+    .sort((a, b) => coverage(stock, demand, a as NutritionId) - coverage(stock, demand, b as NutritionId))[0] as NutritionId | undefined;
+  if (!nutrient || coverage(stock, demand, nutrient) >= 1) return [];
+
   return ACTIVITIES
     .filter(activity => !activity.dormant && FOOD_GOODS.includes(activity.output))
-    .map(activity => ({
-      job: activity.job,
-      shortage: Math.max(0, (demand[activity.output] ?? 0) - (stock[activity.output] ?? 0)),
-      output: dailyOutputPerWorker(activity)
-    }))
-    .filter(item => item.output > 0 && item.shortage > 0)
-    .sort((a, b) => b.shortage / b.output - a.shortage / a.output)
+    .map(activity => ({ job: activity.job, output: nutrientOutputPerWorker(activity, nutrient) }))
+    .filter(item => item.output > 0)
+    .sort((a, b) => b.output - a.output)
     .map(item => item.job);
+}
+
+function coverage(
+  stock: Partial<Record<NutritionId, number>>,
+  demand: Partial<Record<NutritionId, number>>,
+  nutrient: NutritionId
+): number {
+  return (stock[nutrient] ?? 0) / Math.max(1e-9, demand[nutrient] ?? 0);
+}
+
+function nutrientOutputPerWorker(activity: ActivityDefinition, nutrient: NutritionId): number {
+  const food = FOOD_NUTRITION[activity.output];
+  if (!food) return 0;
+  return foodToNutrition(food, dailyOutputPerWorker(activity), activity.output)[nutrient] ?? 0;
 }
 
 export const FOOD_GOODS: Good[] = [
