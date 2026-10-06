@@ -25,8 +25,6 @@ import type {
   Sex
 } from "../types";
 
-export const MAX_FOOD_PURCHASE_ROUNDS = 16;
-
 function cheapestFoodOffers(
   market: readonly AvailableGood[],
   buyerId: number
@@ -93,11 +91,7 @@ export function decidePurchases(
   let moneyLeft = Math.max(0, human.money);
 
   for (const tier of FOOD_PRIORITY_TIERS) {
-    for (
-      let round = 0;
-      round < MAX_FOOD_PURCHASE_ROUNDS && moneyLeft > 1e-9;
-      round++
-    ) {
+    while (moneyLeft > 1e-9) {
       if (!tier.some(nutrientId => needs[nutrientId as TierId] > 1e-9)) {
         break;
       }
