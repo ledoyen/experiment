@@ -950,28 +950,14 @@ export class World {
       this.agents[this.agents.length - 1].money += residue;
     }
   }
-  private reallocateCollectiveFoodWork() {
-    const equalPrices = Object.fromEntries(
-      FOOD_GOODS.map(good => [good, 1])
-    ) as Partial<Record<Good, number>>;
+  private reallocateCollectiveFoodWork(plans: Array<Partial<Record<Good, number>>>) {
     const demand = {} as Partial<Record<Good, number>>;
     for (const good of FOOD_GOODS) demand[good] = 0;
-
-    for (const agent of this.agents) {
-      const plan = planFoodDemand(
-        agent.reserves,
-        agent.sex,
-        agent.state,
-        Number.MAX_SAFE_INTEGER,
-        equalPrices,
-        undefined,
-        agent.metabolicFactor
-      );
+    for (const plan of plans) {
       for (const good of FOOD_GOODS) {
         demand[good] = (demand[good] ?? 0) + (plan[good] ?? 0);
       }
     }
-
     const stock = this.getStockTotals();
     const hasShortage = FOOD_GOODS.some(good =>
       (demand[good] ?? 0) > (stock[good] ?? 0)
@@ -999,12 +985,6 @@ export class World {
   }
 
   private processCollectiveNutritionDay() {
-    // Without money, scarce labour is redirected toward food when physical
-    // stocks cannot cover physiological demand. The 67% ceiling is historical,
-    // not a calibration coefficient: France had 67% of its population living
-    // from agriculture in 1789. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
-    this.reallocateCollectiveFoodWork();
-
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
@@ -1023,6 +1003,12 @@ const population = Math.max(1, this.agents.length);
         agent.metabolicFactor
       )
     );
+
+    // Without money, scarce labour is redirected toward food when physical
+    // stocks cannot cover physiological demand. The 67% ceiling is historical,
+    // not a calibration coefficient: France had 67% of its population living
+    // from agriculture in 1789. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
+    this.reallocateCollectiveFoodWork(plans);
 
     const fractions = {} as Record<Good, number>;
 
