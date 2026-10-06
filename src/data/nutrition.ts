@@ -245,3 +245,45 @@ export function isLethalNutritionState(
       (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;
   });
 }
+
+
+export type NutritionStatusLevel = "normal" | "deficient" | "depleted";
+
+export interface NutritionStatus {
+  level: NutritionStatusLevel;
+  deficient: NutritionId[];
+  depleted: NutritionId[];
+}
+
+// A reserve below one daily requirement is a simulation deficiency warning, not a clinical diagnosis.
+// WHO describes nutrient deficiencies as capable of reducing physical capacity, productivity and health.
+// Source: https://www.who.int/health-topics/micronutrients
+export function nutritionStatus(
+  reserves: NutritionReserves,
+  sex: Sex,
+  state: PhysiologyState,
+  requirementFactor = 1
+): NutritionStatus {
+  const deficient = NUTRITION.filter(nutrient =>
+    reserves[nutrient.id].value < targetFor(nutrient, sex, state) * requirementFactor
+  ).map(nutrient => nutrient.id);
+  const depleted = deficient.filter(id => reserves[id].value <= 0);
+  return { level: depleted.length ? "depleted" : deficient.length ? "deficient" : "normal", deficient, depleted };
+}
+
+// Work capacity is limited by depleted energy, protein, carbohydrate or fat reserves.
+// This is a direct reserve ratio, not an empirical penalty coefficient. Source:
+// https://www.who.int/health-topics/nutrition
+export function nutritionWorkCapacity(
+  reserves: NutritionReserves,
+  sex: Sex,
+  state: PhysiologyState,
+  requirementFactor = 1
+): number {
+  const ids: NutritionId[] = ["energy", "protein", "carbohydrate", "fat"];
+  return Math.min(
+    1,
+    ...ids.map(id => reserves[id].value /
+      Math.max(1e-9, targetFor(NUTRITION.find(nutrient => nutrient.id === id)!, sex, state) * requirementFactor))
+  );
+}
