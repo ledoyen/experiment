@@ -281,9 +281,9 @@ export function nutritionWorkCapacity(
   requirementFactor = 1
 ): number {
   const ids: NutritionId[] = ["energy", "protein", "carbohydrate", "fat"];
-  return Math.min(
-    1,
-    ...ids.map(id => reserves[id].value /
-      Math.max(1e-9, targetFor(NUTRITION.find(nutrient => nutrient.id === id)!, sex, state) * requirementFactor))
-  );
+  const ratios = ids.map(id => {
+    const target = targetFor(NUTRITION.find(nutrient => nutrient.id === id)!, sex, state) * requirementFactor;
+    return reserves[id].value < target ? reserves[id].value / Math.max(1e-9, target) : 1;
+  });
+  return Math.min(1, ...ratios);
 }
