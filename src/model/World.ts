@@ -1,4 +1,4 @@
-import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson } from "../data/economy";
+import { ACTIVITIES, ACTIVE_WORKER_SHARE, COLLECTIVE_FOOD_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByShortage } from "../data/economy";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
@@ -948,7 +948,61 @@ export class World {
       this.agents[this.agents.length - 1].money += residue;
     }
   }
+  private reallocateCollectiveFoodWork() {
+    const equalPrices = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, 1])
+    ) as Partial<Record<Good, number>>;
+    const demand = {} as Partial<Record<Good, number>>;
+    for (const good of FOOD_GOODS) demand[good] = 0;
+
+    for (const agent of this.agents) {
+      const plan = planFoodDemand(
+        agent.reserves,
+        agent.sex,
+        agent.state,
+        Number.MAX_SAFE_INTEGER,
+        equalPrices,
+        undefined,
+        agent.metabolicFactor
+      );
+      for (const good of FOOD_GOODS) {
+        demand[good] = (demand[good] ?? 0) + (plan[good] ?? 0);
+      }
+    }
+
+    const stock = this.getStockTotals();
+    const hasShortage = FOOD_GOODS.some(good =>
+      (demand[good] ?? 0) > (stock[good] ?? 0)
+    );
+    if (!hasShortage) return;
+
+    const foodWorkers = this.agents.filter(agent =>
+      activityByJob(agent.job)?.output &&
+      FOOD_GOODS.includes(activityByJob(agent.job)!.output)
+    ).length;
+    const targetWorkers = Math.ceil(this.agents.length * COLLECTIVE_FOOD_WORKER_SHARE);
+    const neededWorkers = Math.max(0, targetWorkers - foodWorkers);
+    if (neededWorkers === 0) return;
+
+    const rankedJobs = rankFoodJobsByShortage(demand, stock);
+    const candidates = this.agents.filter(agent =>
+      !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
+    );
+
+    for (let index = 0; index < Math.min(neededWorkers, candidates.length); index++) {
+      const agent = candidates[index];
+      const job = rankedJobs[index % Math.max(1, rankedJobs.length)];
+      if (job) agent.job = job;
+    }
+  }
+
   private processCollectiveNutritionDay() {
+    // Without money, scarce labour is redirected toward food when physical
+    // stocks cannot cover physiological demand. The 67% ceiling is historical,
+    // not a calibration coefficient: France had 67% of its population living
+    // from agriculture in 1789. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
+    this.reallocateCollectiveFoodWork();
+
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
