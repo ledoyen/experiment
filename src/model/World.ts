@@ -1,4 +1,4 @@
-import { ACTIVITIES, ACTIVE_WORKER_SHARE, COLLECTIVE_FOOD_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByShortage } from "../data/economy";
+import { ACTIVITIES, ACTIVE_WORKER_SHARE, COLLECTIVE_FOOD_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
@@ -452,6 +452,7 @@ export class World {
       const production =
         dailyOutputPerWorker(activity) *
         agent.productivity *
+        nutritionWorkCapacity(agent.reserves, agent.sex, agent.state, agent.metabolicFactor) *
         seasonalProductionMultiplier(activity.job, simulationDay);
 
       if (!Number.isFinite(production) || production <= 0) continue;
@@ -898,7 +899,7 @@ export class World {
         agent.money,
         plannedFoodSpend,
         energyRatio
-      );
+      ) || nutritionStatus(agent.reserves, agent.sex, agent.state, agent.metabolicFactor).level !== "normal";
 
       if (currentMinute < agent.nextJobReviewMinute && !urgentReview) continue;
 
@@ -951,36 +952,49 @@ export class World {
     }
   }
   private reallocateCollectiveFoodWork(plans: Array<Partial<Record<Good, number>>>) {
-    const demand = {} as Partial<Record<Good, number>>;
-    for (const good of FOOD_GOODS) demand[good] = 0;
+    const demand = {} as Partial<Record<NutritionId, number>>;
+    const stock = {} as Partial<Record<NutritionId, number>>;
+
     for (const plan of plans) {
       for (const good of FOOD_GOODS) {
-        demand[good] = (demand[good] ?? 0) + (plan[good] ?? 0);
+        const quantity = plan[good] ?? 0;
+        const food = FOOD_NUTRITION[good];
+        if (!food || quantity <= 0) continue;
+        const nutrients = foodToNutrition(food, quantity, good);
+        for (const nutrient of NUTRITION) {
+          demand[nutrient.id] = (demand[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+        }
       }
     }
-    const stock = this.getStockTotals();
-    const hasShortage = FOOD_GOODS.some(good =>
-      (demand[good] ?? 0) > (stock[good] ?? 0)
-    );
-    if (!hasShortage) return;
+
+    for (const agent of this.agents) {
+      for (const good of FOOD_GOODS) {
+        const quantity = agent.inventory[good] ?? 0;
+        const food = FOOD_NUTRITION[good];
+        if (!food || quantity <= 0) continue;
+        const nutrients = foodToNutrition(food, quantity, good);
+        for (const nutrient of NUTRITION) {
+          stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+        }
+      }
+    }
+
+    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock);
+    if (!rankedJobs.length) return;
 
     const foodWorkers = this.agents.filter(agent =>
-      activityByJob(agent.job)?.output &&
-      FOOD_GOODS.includes(activityByJob(agent.job)!.output)
+      FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
     ).length;
     const targetWorkers = Math.ceil(this.agents.length * COLLECTIVE_FOOD_WORKER_SHARE);
     const neededWorkers = Math.max(0, targetWorkers - foodWorkers);
     if (neededWorkers === 0) return;
 
-    const rankedJobs = rankFoodJobsByShortage(demand, stock);
     const candidates = this.agents.filter(agent =>
       !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
     );
 
     for (let index = 0; index < Math.min(neededWorkers, candidates.length); index++) {
-      const agent = candidates[index];
-      const job = rankedJobs[index % Math.max(1, rankedJobs.length)];
-      if (job) agent.job = job;
+      candidates[index].job = rankedJobs[index % rankedJobs.length];
     }
   }
 
