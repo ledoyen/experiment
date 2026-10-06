@@ -957,13 +957,6 @@ const population = Math.max(1, this.agents.length);
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
     ) as Partial<Record<Good, number>>;
-    const perCapitaSupply = Object.fromEntries(
-      FOOD_GOODS.map(good => [
-        good,
-        this.inventoryTotal(good) / population
-      ])
-    ) as Partial<Record<Good, number>>;
-
     const plans = this.agents.map(agent =>
       planFoodDemand(
         agent.reserves,
@@ -971,7 +964,7 @@ const population = Math.max(1, this.agents.length);
         agent.state,
         Number.MAX_SAFE_INTEGER,
         equalPrices,
-        perCapitaSupply,
+        undefined,
         agent.metabolicFactor
       )
     );
