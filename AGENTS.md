@@ -1,35 +1,51 @@
-# Règles de contribution à la simulation
+# Contribution rules for the simulation
 
-Ce projet doit rester compréhensible par une personne qui connaît l'économie mais peu le code.
+This project must remain understandable to a contributor who knows economics but little code.
 
-## Règle principale
+## Core rule
 
-Les **valeurs qui définissent les règles de la simulation** (valeurs par défaut, ratios, coefficients, seuils, prix de référence, durées, besoins, calibrations, etc.) doivent être placées dans `src/data/`.
+All values that define simulation rules (defaults, ratios, coefficients, thresholds, reference prices, durations, needs, calibrations, etc.) must live in `src/data/`.
 
-Les fonctions de calcul qui utilisent ces valeurs et qui ne dépendent pas de l'état mutable du monde doivent également être dans `src/data/` et être **pures** :
-- mêmes entrées → même résultat ;
-- aucun accès ou changement de `World`, DOM, horloge, hasard ou état global mutable ;
-- pas d'effet de bord.
+Pure calculation functions that use those values and do not depend on mutable world state must also live in `src/data/`:
+- same inputs -> same result;
+- no access to or mutation of `World`, the DOM, the clock, randomness, or mutable global state;
+- no side effects.
 
-## Lisibilité
+## Readability
 
-Une valeur ou une règle doit être :
-- **simple** ;
-- **bien nommée** ;
-- accompagnée d'un commentaire indiquant la justification de la valeur et un lien web vers la source ou référence externe ; exception : les fonctions pures dont le calcul est immédiatement évident n'ont pas besoin de source ;
-- exprimée dans les unités du modèle.
+Every rule value or non-obvious rule function must be:
+- simple;
+- clearly named;
+- accompanied by an English comment explaining why the value or rule exists and linking to an external source or reference; obvious pure functions do not need a source;
+- expressed in the model's units.
 
-Les fonctions de règles dans `src/data/` doivent rester **courtes : 20 lignes maximum**. Si une règle devient plus complexe, la découper en plusieurs fonctions nommées.
+Rule functions in `src/data/` must stay short: **20 lines maximum**. Split longer rules into several named functions.
 
-Le code de `src/model/` orchestre la simulation ; il ne doit pas devenir le lieu où sont cachées des règles économiques ou physiologiques.
+The code in `src/model/` orchestrates the simulation; it must not hide economic or physiological rules.
 
-L'objectif est qu'un contributeur économiste puisse ouvrir `src/data/`, comprendre les hypothèses et modifier une règle sans devoir comprendre toute l'architecture technique.
+The goal is that an economist can open `src/data/`, understand the assumptions, and change a rule without understanding the whole technical architecture.
 
-## Simulation CLI et GitHub Actions
+## Language
 
-La simulation CLI utilise **exactement le même `World` que l'interface graphique**. Elle ne constitue pas un second modèle : elle crée un `World` avec les paramètres initiaux, avance d'un jour à la fois aussi vite que possible et exporte l'historique analytique en CSV.
+All committed code, comments, documentation, configuration text, workflow text, and other repository text must be written in **English**. External source links may point to sources written in other languages.
 
-Commande locale :
+## CI requirement
+
+**Every commit must leave the repository with a passing CI.**
+
+Before creating a commit:
+1. run the relevant checks locally when possible;
+2. inspect the result, do not assume it passes;
+3. after a sequence of commits, verify the GitHub Actions run for the resulting commit;
+4. never knowingly leave `main` with a failing build or test.
+
+For simulation research, use the CLI simulation workflow and its CSV artifacts to iterate. Do not add temporary diagnostic code just to inspect a run.
+
+## CLI simulation and GitHub Actions
+
+The CLI simulation uses **exactly the same `World` as the graphical interface**. It is not a second model: it creates a `World` with the initial parameters, advances one day at a time as fast as possible, and exports the analytical history as CSV.
+
+Local command:
 
 ```bash
 npm run simulate -- \
@@ -44,20 +60,17 @@ npm run simulate -- \
   --output simulation.csv
 ```
 
-Les six paramètres initiaux correspondent aux valeurs de `defaultParameters()` dans `src/data/defaults.ts`. Le workflow GitHub reproduit volontairement ces valeurs dans ses champs par défaut : **si les valeurs par défaut de la simulation changent, mettre aussi à jour les défauts du workflow**.
+The six initial parameters correspond to the values in `defaultParameters()` in `src/data/defaults.ts`. The GitHub workflow intentionally repeats these defaults in its inputs: **when simulation defaults change, update the workflow defaults too**.
 
-Pour lancer une expérience sans argent, laisser `money-introduction-day` vide. Pour introduire l'argent au début d'un jour donné, mettre par exemple `178`. `money-enabled=true` signifie que l'argent est actif dès le début ; il ne doit pas être combiné avec une date d'introduction.
+Leave `money-introduction-day` empty for a simulation without money. Set it to a day such as `178` to introduce money at the beginning of that day. `money-enabled=true` means that money is active from the beginning and must not be combined with an introduction date.
 
-Le workflow `.github/workflows/run-simulation.yml` est déclenché manuellement avec **Run workflow**. Il expose tous les paramètres initiaux, la durée et le jour d'introduction de l'argent. La vitesse n'est pas un paramètre : la CLI avance directement d'une journée à l'autre, sans rendu graphique. À la fin, `simulation.csv` contient l'historique agrégé et `simulation-final-agents.csv` contient l'état final de chaque individu, avec ses stocks, réserves physiologiques et compteurs de déficit. Les deux fichiers sont disponibles dans le même artefact GitHub Actions téléchargeable.
+The workflow `.github/workflows/run-simulation.yml` can be run manually with **Run workflow**. It exposes all initial parameters, the duration, and the money introduction day. Speed is not an input: the CLI advances directly day by day without graphical rendering. At the end, `simulation.csv` contains aggregate history and `simulation-final-agents.csv` contains the final state of every individual, including stocks, physiological reserves, and deficiency counters. Both files are stored in the same GitHub Actions artifact.
 
-Pour une itération de recherche, privilégier ce workflow et l'analyse du CSV plutôt que d'ajouter du code temporaire ou des paramètres de diagnostic au modèle.
+## Issue-triggered simulations
 
+The workflow `.github/workflows/run-simulation.yml` can also run when an issue is created or edited. To prevent ordinary issues from launching simulations, this mode is accepted only when the issue author is **`ledoyen`**.
 
-### Déclenchement par issue
-
-Le workflow `.github/workflows/run-simulation.yml` peut aussi être déclenché par la création ou la modification d'une issue. Pour éviter qu'une issue ordinaire lance une simulation, ce mode n'est accepté que si l'auteur de l'issue est **`ledoyen`**.
-
-Dans ce cas, le corps de l'issue doit être **exactement un objet JSON** contenant les huit paramètres suivants, sans champ supplémentaire :
+The issue body must be **exactly one JSON object** containing these eight parameters and no extra field:
 
 ```json
 {
@@ -72,4 +85,16 @@ Dans ce cas, le corps de l'issue doit être **exactement un objet JSON** contena
 }
 ```
 
-`money_introduction_day: null` signifie aucune introduction. Le workflow valide la structure et les types avant de lancer la simulation. Pour relancer une expérience, modifier le corps de la même issue : l'événement `edited` relancera alors le workflow.
+`money_introduction_day: null` means no introduction. The workflow validates the structure and types before starting the simulation. To rerun an experiment, edit the same issue: the `edited` event starts the workflow again.
+
+## Simulation model discipline
+
+Do not add an arbitrary coefficient merely to make a population survive.
+
+When a simulation fails to reach a stable population, first identify the physical or physiological cause in the generated CSV and correct it with:
+- a sourced value;
+- a sourced relationship;
+- a pure rule derived directly from the model's units;
+- or a missing mechanism that is required to represent the intended economic system.
+
+All such changes must remain understandable in `src/data/` and must include an English source comment unless the rule is mathematically obvious.
