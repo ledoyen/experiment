@@ -43,7 +43,10 @@ function cheapestFoodOffers(
 // This avoids consuming an energy-dense staple simply because it is the cheapest
 // way to satisfy a later vitamin/mineral need. Energy balance is a separate
 // physiological constraint. Reference: https://www.anses.fr/en/system/files/NUT2012SA0103Ra-1EN.pdf
-// Technical convergence guard for the market matching loop; it is not an economic parameter.\nexport const MAX_FOOD_PURCHASE_ROUNDS = 16;\n\nexport const FOOD_PRIORITY_TIERS = [
+// Technical convergence guard for the market matching loop; it is not an economic parameter.
+export const MAX_FOOD_PURCHASE_ROUNDS = 16;
+
+export const FOOD_PRIORITY_TIERS = [
   ["protein", "carbohydrate", "fat", "fiber"] as const,
   [
     "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3",
