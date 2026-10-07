@@ -142,8 +142,6 @@ export const GOOD_PRICE_UNIT: Record<Good, string> = {
 
 // Historical reference for a preindustrial society: in France in 1789, 67% of the
 // population lived in agricultural households. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
-export const COLLECTIVE_FOOD_WORKER_SHARE = 0.67;
-
 // Purely ranks food-producing jobs by physical shortage per worker of output.
 // No monetary signal or arbitrary productivity coefficient is involved.
 export function rankFoodJobsByNutrientShortage(
@@ -155,6 +153,7 @@ export function rankFoodJobsByNutrientShortage(
   const result: Job[] = [];
   const projected = { ...stock };
   for (let i = 0; i < workerCount && available.length; i++) {
+    if (minimumNutritionCoverage(demand, projected) >= 1) break;
     const best = bestFoodActivity(available, demand, projected);
     if (!best) break;
     result.push(best.job);
@@ -198,6 +197,16 @@ function nutritionCoverageAfter(
     );
   }
   return coverage;
+}
+
+function minimumNutritionCoverage(
+  demand: Partial<Record<NutritionId, number>>,
+  stock: Partial<Record<NutritionId, number>>
+) {
+  return Math.min(...NUTRITION.map(nutrient => {
+    const need = demand[nutrient.id] ?? 0;
+    return need > 0 ? (stock[nutrient.id] ?? 0) / need : 1;
+  }));
 }
 
 function nutrientOutput(activity: ActivityDefinition) {
