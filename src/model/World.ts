@@ -1,4 +1,4 @@
-import { ACTIVITIES, ACTIVE_WORKER_SHARE, COLLECTIVE_FOOD_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
+import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
 import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, nutritionStatus, nutritionWorkCapacity, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
@@ -979,21 +979,11 @@ export class World {
       }
     }
 
-    const foodWorkers = this.agents.filter(agent =>
-      FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
-    ).length;
-    const targetWorkers = Math.ceil(this.agents.length * COLLECTIVE_FOOD_WORKER_SHARE);
-    const neededWorkers = Math.max(0, targetWorkers - foodWorkers);
-    if (neededWorkers === 0) return;
-
-    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, neededWorkers);
-    if (!rankedJobs.length) return;
-
     const candidates = this.agents.filter(agent =>
       !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
     );
-
-    for (let index = 0; index < Math.min(neededWorkers, candidates.length); index++) {
+    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
+    for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
     }
   }
