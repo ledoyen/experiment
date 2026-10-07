@@ -899,7 +899,7 @@ export class World {
         agent.money,
         plannedFoodSpend,
         energyRatio
-      ) || nutritionStatus(agent.nutritionDeficitDays).level === "depleted";
+      ) || nutritionStatus(agent.nutritionDeficitDays).level === "deficient";
 
       if (currentMinute < agent.nextJobReviewMinute && !urgentReview) continue;
 
