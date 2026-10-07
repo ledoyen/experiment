@@ -125,6 +125,7 @@ function run(options: CliOptions): void {
     `Simulation finished: day ${options.durationDays}, population ${metrics.population}, ` +
     `money ${metrics.moneySupply}, outputs ${options.output} and ${finalAgentsOutput}`
   );
+  console.log("Death causes:", JSON.stringify(world.getDeathCauses()));
 }
 
 try {
