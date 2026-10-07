@@ -220,7 +220,7 @@ function minimumNutritionCoverage(
   }));
 }
 
-function nutrientOutput(activity: ActivityDefinition) {
+// Selects the food activity that best addresses the nutrients currently below their daily targets.\n// This is a pure physical matching rule: no price, productivity or tuning coefficient is used.\nexport function bestFoodJobForDeficits(\n  deficits: Partial<Record<NutritionId, number>>\n): Job | undefined {\n  const options = foodActivityOutputs();\n  return options.reduce<FoodActivityOutput | undefined>((best, option) => {\n    if (!best) return option;\n    return nutritionDeficitCoverage(option.output, deficits) >\n      nutritionDeficitCoverage(best.output, deficits) ? option : best;\n  }, undefined)?.activity.job;\n}\n\nfunction nutritionDeficitCoverage(\n  output: Partial<Record<NutritionId, number>>,\n  deficits: Partial<Record<NutritionId, number>>\n): number {\n  return Math.min(...NUTRITION.map(nutrient => {\n    const deficit = deficits[nutrient.id] ?? 0;\n    return deficit > 0 ? (output[nutrient.id] ?? 0) / deficit : 1;\n  }));\n}\n\nfunction nutrientOutput(activity: ActivityDefinition) {
   const food = FOOD_NUTRITION[activity.output];
   return food ? foodToNutrition(food, dailyOutputPerWorker(activity), activity.output) : {};
 }
