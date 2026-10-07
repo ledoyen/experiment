@@ -148,34 +148,73 @@ export const COLLECTIVE_FOOD_WORKER_SHARE = 0.67;
 // No monetary signal or arbitrary productivity coefficient is involved.
 export function rankFoodJobsByNutrientShortage(
   demand: Partial<Record<NutritionId, number>>,
-  stock: Partial<Record<NutritionId, number>>
-): Job[] {
-  const nutrient = Object.keys(demand)
-    .filter(id => (demand[id as NutritionId] ?? 0) > 0)
-    .sort((a, b) => coverage(stock, demand, a as NutritionId) - coverage(stock, demand, b as NutritionId))[0] as NutritionId | undefined;
-  if (!nutrient || coverage(stock, demand, nutrient) >= 1) return [];
-
-  return ACTIVITIES
-    .filter(activity => !activity.dormant && FOOD_GOODS.includes(activity.output))
-    .map(activity => ({ job: activity.job, output: nutrientOutputPerWorker(activity, nutrient) }))
-    .filter(item => item.output > 0)
-    .sort((a, b) => b.output - a.output)
-    .map(item => item.job);
-}
-
-function coverage(
   stock: Partial<Record<NutritionId, number>>,
-  demand: Partial<Record<NutritionId, number>>,
-  nutrient: NutritionId
-): number {
-  return (stock[nutrient] ?? 0) / Math.max(1e-9, demand[nutrient] ?? 0);
+  workerCount = 1
+): Job[] {
+  const available = foodActivities();
+  const result: Job[] = [];
+  const projected = { ...stock };
+  for (let i = 0; i < workerCount && available.length; i++) {
+    const best = bestFoodActivity(available, demand, projected);
+    if (!best) break;
+    result.push(best.job);
+    addWorkerNutrition(projected, best);
+  }
+  return result;
 }
 
-function nutrientOutputPerWorker(activity: ActivityDefinition, nutrient: NutritionId): number {
-  const food = FOOD_NUTRITION[activity.output];
-  if (!food) return 0;
-  return foodToNutrition(food, dailyOutputPerWorker(activity), activity.output)[nutrient] ?? 0;
+function foodActivities() {
+  return ACTIVITIES.filter(activity =>
+    !activity.dormant && FOOD_GOODS.includes(activity.output) &&
+    dailyOutputPerWorker(activity) > 0
+  );
 }
+
+function bestFoodActivity(
+  activities: ActivityDefinition[],
+  demand: Partial<Record<NutritionId, number>>,
+  stock: Partial<Record<NutritionId, number>>
+) {
+  return activities.reduce<ActivityDefinition | undefined>((best, activity) => {
+    if (!best) return activity;
+    return nutritionCoverageAfter(activity, demand, stock) >
+      nutritionCoverageAfter(best, demand, stock) ? activity : best;
+  }, undefined);
+}
+
+function nutritionCoverageAfter(
+  activity: ActivityDefinition,
+  demand: Partial<Record<NutritionId, number>>,
+  stock: Partial<Record<NutritionId, number>>
+) {
+  let coverage = 1;
+  const output = nutrientOutput(activity);
+  for (const nutrient of NUTRITION) {
+    const need = demand[nutrient.id] ?? 0;
+    if (need <= 0) continue;
+    coverage = Math.min(
+      coverage,
+      ((stock[nutrient.id] ?? 0) + output[nutrient.id]) / need
+    );
+  }
+  return coverage;
+}
+
+function nutrientOutput(activity: ActivityDefinition) {
+  const food = FOOD_NUTRITION[activity.output];
+  return food ? foodToNutrition(food, dailyOutputPerWorker(activity), activity.output) : {};
+}
+
+function addWorkerNutrition(
+  stock: Partial<Record<NutritionId, number>>,
+  activity: ActivityDefinition
+) {
+  const output = nutrientOutput(activity);
+  for (const nutrient of NUTRITION) {
+    stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0);
+  }
+}
+
 
 export const FOOD_GOODS: Good[] = [
   "ble", "pomme_de_terre", "legumineuses", "legumes", "fruits",
