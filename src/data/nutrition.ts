@@ -223,18 +223,20 @@ export function foodToNutrition(food: FoodNutrition, quantity: number, good?: Go
 /** Zero is the simulation death boundary, not a medical threshold. */
 // A reserve below its critical threshold is not immediate death. It becomes lethal only
 // when the individual remains below that threshold for the nutrient's defined duration.
+// A reserve of zero is not itself a deficiency: it can mean that today's requirement was exactly met.
+ // Deficiency is therefore tracked from intake below the physiological target, not from reserve level.
 export function updateNutritionDeficitDays(
-  reserves: NutritionReserves,
+  intake: Partial<Record<NutritionId, number>>,
+  sex: Sex,
+  state: PhysiologyState,
+  requirementFactor: number,
   previousDeficitDays: Partial<Record<NutritionId, number>>
 ): Partial<Record<NutritionId, number>> {
-  return Object.fromEntries(
-    NUTRITION.map(nutrient => {
-      const rule = NUTRITION_MORTALITY[nutrient.id];
-      const criticalReserve = (reserves[nutrient.id].max / nutrient.maxDays) * rule.criticalReserveDays;
-      const days = previousDeficitDays[nutrient.id] ?? 0;
-      return [nutrient.id, reserves[nutrient.id].value < criticalReserve ? days + 1 : 0];
-    })
-  );
+  return Object.fromEntries(NUTRITION.map(nutrient => {
+    const target = targetFor(nutrient, sex, state) * requirementFactor;
+    const days = previousDeficitDays[nutrient.id] ?? 0;
+    return [nutrient.id, (intake[nutrient.id] ?? 0) < target ? days + 1 : 0];
+  }));
 }
 
 // Returns the nutrients whose documented lethal-duration rule has been reached.
