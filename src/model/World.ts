@@ -49,6 +49,10 @@ const gini = (values: number[]) => {
   return (2 * weighted) / (sorted.length * sum) - (sorted.length + 1) / sorted.length;
 };
 
+export interface WorldOptions {
+  recordSnapshots?: boolean;
+}
+
 export class World {
   readonly width = 1800;
   readonly height = 1100;
@@ -67,12 +71,14 @@ export class World {
     parameterEvents: ParameterChangeEvent[];
   }> = [];
   private readonly parameterEvents: ParameterChangeEvent[] = [];
+  private readonly recordSnapshots: boolean;
   private readonly snapshotWindowMinutes = 60;
   private runInitialParameters: Parameters;
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
 
-  constructor(parameters: Parameters) {
+  constructor(parameters: Parameters, options: WorldOptions = {}) {
+    this.recordSnapshots = options.recordSnapshots ?? true;
     this.parameters = structuredClone(parameters);
     this.runInitialParameters = structuredClone(parameters);
     this.reset();
@@ -368,6 +374,7 @@ export class World {
   private capture() {
     this.history.push(this.getMetrics());
     if (this.history.length > 5000) this.compactHistory();
+    if (!this.recordSnapshots) return;
     this.snapshots.push({
       minute: this.minute,
       prices: { ...this.prices },
