@@ -1117,8 +1117,23 @@ this.removeDeadAgents();
     const survivors: Human[] = [];
 
     for (const agent of this.agents) {
-      const causes = lethalNutritionCauses(agent.nutritionDeficitDays);
-      if (causes.length > 0 && isLethalNutritionState(agent.reserves, agent.nutritionDeficitDays)) {
+      const causes = lethalNutritionCauses(
+        agent.reserves,
+        agent.nutritionDeficitDays,
+        agent.sex,
+        agent.state,
+        agent.metabolicFactor
+      );
+      if (
+        causes.length > 0 &&
+        isLethalNutritionState(
+          agent.reserves,
+          agent.nutritionDeficitDays,
+          agent.sex,
+          agent.state,
+          agent.metabolicFactor
+        )
+      ) {
         for (const nutrient of causes) {
           this.deathCauses[nutrient] = (this.deathCauses[nutrient] ?? 0) + 1;
         }
