@@ -965,57 +965,27 @@ export class World {
       this.agents[this.agents.length - 1].money += residue;
     }
   }
-  private reallocateCollectiveFoodWork(plans: Array<Partial<Record<Good, number>>>) {
-    const demand = {} as Partial<Record<NutritionId, number>>;
-    const stock = {} as Partial<Record<NutritionId, number>>;
-
-    for (const plan of plans) {
-      for (const good of FOOD_GOODS) {
-        const quantity = plan[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          demand[nutrient.id] = (demand[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
-        }
-      }
-    }
-
-    for (const agent of this.agents) {
-      for (const good of FOOD_GOODS) {
-        const quantity = agent.inventory[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
-        }
-      }
-    }
-
+  private reallocateCollectiveFoodWork() {
     const candidates = this.agents.filter(agent =>
       !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good)) &&
-      agent.nutritionDeficitDays &&
-      Object.keys(agent.nutritionDeficitDays).some(id =>
-        (agent.nutritionDeficitDays[id as NutritionId] ?? 0) > 0
-      )
+      Object.values(agent.nutritionDeficitDays).some(days => days > 0)
     );
 
     for (const agent of candidates) {
       const deficits = Object.fromEntries(
         NUTRITION.map(nutrient => [
           nutrient.id,
-          Math.max(0, targetFor(nutrient, agent.sex, agent.state) *
-            agent.metabolicFactor - agent.reserves[nutrient.id].value)
+          Math.max(
+            0,
+            targetFor(nutrient, agent.sex, agent.state) *
+              agent.metabolicFactor -
+              agent.reserves[nutrient.id].value
+          )
         ])
       ) as Partial<Record<NutritionId, number>>;
+
       const job = bestFoodJobForDeficits(deficits);
       if (job) agent.job = job;
-    }
-
-    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
-    for (let index = 0; index < rankedJobs.length; index++) {
-      if (candidates[index].job === undefined) candidates[index].job = rankedJobs[index];
     }
   }
 
@@ -1042,7 +1012,7 @@ export class World {
     // stocks cannot cover physiological demand. The 67% ceiling is historical,
     // not a calibration coefficient: France had 67% of its population living
     // from agriculture in 1789. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
-    this.reallocateCollectiveFoodWork(plans);
+    this.reallocateCollectiveFoodWork();
 
     const fractions = {} as Record<Good, number>;
 
