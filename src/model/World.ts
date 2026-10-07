@@ -979,9 +979,6 @@ export class World {
       }
     }
 
-    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock);
-    if (!rankedJobs.length) return;
-
     const foodWorkers = this.agents.filter(agent =>
       FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
     ).length;
@@ -989,12 +986,15 @@ export class World {
     const neededWorkers = Math.max(0, targetWorkers - foodWorkers);
     if (neededWorkers === 0) return;
 
+    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, neededWorkers);
+    if (!rankedJobs.length) return;
+
     const candidates = this.agents.filter(agent =>
       !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
     );
 
     for (let index = 0; index < Math.min(neededWorkers, candidates.length); index++) {
-      candidates[index].job = rankedJobs[index % rankedJobs.length];
+      candidates[index].job = rankedJobs[index];
     }
   }
 
