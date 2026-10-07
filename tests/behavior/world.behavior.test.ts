@@ -35,7 +35,7 @@ describe("simulation behavioral invariants", () => {
   });
 
   it("conserves the initial money supply through individual transactions and deaths", () => {
-    const world = new World({
+    const world = testWorld({
       ...defaultParameters(),
       population: 200,
       initialMoney: 100,
@@ -54,7 +54,7 @@ describe("simulation behavioral invariants", () => {
   });
 
   it("keeps a monetary population viable through the first month", () => {
-    const world = new World({
+    const world = testWorld({
       ...defaultParameters(),
       population: 200,
       initialMoney: 100,
@@ -68,7 +68,7 @@ describe("simulation behavioral invariants", () => {
   });
 
   it("keeps prices and population metrics finite", () => {
-    const world = new World({
+    const world = testWorld({
       ...defaultParameters(),
       population: 200,
       initialMoney: 100,
@@ -101,7 +101,7 @@ describe("simulation behavioral invariants", () => {
   });
 
   it("makes pre-money food stocks available when money is introduced", () => {
-    const world = new World({
+    const world = testWorld({
       ...defaultParameters(),
       population: 3,
       initialMoney: 100,
