@@ -129,7 +129,8 @@ jobs:
                       print(f"{column}: max={max(values):.6g}, deficient={sum(value > 0 for value in values)}")
           PY
 
-      - name: Upload simulation CSV        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
+      - name: Upload simulation CSV
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
         uses: actions/upload-artifact@v4
         with:
           name: simulation-csv
