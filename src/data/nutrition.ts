@@ -12,6 +12,7 @@ export interface NutritionDefinition {
   labelKey: string;
   unit: string;
   maxDays: number;
+  priority: number;
   target: Record<Sex, number>;
   pregnancy?: number;
   lactation?: number;
@@ -93,11 +94,11 @@ export const INDIVIDUAL_REQUIREMENT_VARIANCE = 0.10;
 
 // Adult reference values are based on ANSES/EFSA dietary reference values; the model keeps the initial scope intentionally small and uses sex-specific values where the source supports them. Source: https://www.anses.fr/en/system/files/NUT2012SA0103Ra-1EN.pdf
 export const NUTRITION: NutritionDefinition[] = [
-  { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 7, target: { male: 2500, female: 2000 } },
-  { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, target: { male: 58.1, female: 58.1 } },
-  { id: "carbohydrate", labelKey: "phys.carbohydrate", unit: "g", maxDays: 7, target: { male: 328.1, female: 262.5 } },
-  { id: "fat", labelKey: "phys.fat", unit: "g", maxDays: 7, target: { male: 76.4, female: 61.1 } },
-  { id: "fiber", labelKey: "phys.fiber", unit: "g", maxDays: 7, target: { male: 25, female: 25 } },
+  { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 7, priority: 1, target: { male: 2500, female: 2000 } },
+  { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, priority: 2, target: { male: 58.1, female: 58.1 } },
+  { id: "carbohydrate", labelKey: "phys.carbohydrate", unit: "g", maxDays: 7, priority: 3, target: { male: 328.1, female: 262.5 } },
+  { id: "fat", labelKey: "phys.fat", unit: "g", maxDays: 7, priority: 4, target: { male: 76.4, female: 61.1 } },
+  { id: "fiber", labelKey: "phys.fiber", unit: "g", maxDays: 7, priority: 5, target: { male: 25, female: 25 } },
   { id: "vitamin_A", labelKey: "phys.vitamin_A", unit: "µg RE", maxDays: 30, target: { male: 750, female: 650 } },
   { id: "vitamin_B1", labelKey: "phys.vitamin_B1", unit: "mg", maxDays: 30, target: { male: 1.1, female: 0.9 } },
   { id: "vitamin_B2", labelKey: "phys.vitamin_B2", unit: "mg", maxDays: 30, target: { male: 1.6, female: 1.4 } },
