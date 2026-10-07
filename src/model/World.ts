@@ -987,6 +987,19 @@ export class World {
           stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
         }
       }
+
+      // Production happens after labour allocation and before consumption.
+      // Include today's expected output from workers already assigned to food
+      // so the shortage detector does not react one day too late.
+      const activity = activityByJob(agent.job);
+      if (!activity || activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
+      const expectedOutput = dailyOutputPerWorker(activity) * agent.productivity;
+      const food = FOOD_NUTRITION[activity.output];
+      if (!food || !Number.isFinite(expectedOutput) || expectedOutput <= 0) continue;
+      const nutrients = foodToNutrition(food, expectedOutput, activity.output);
+      for (const nutrient of NUTRITION) {
+        stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+      }
     }
 
     const candidates = this.agents.filter(agent =>
