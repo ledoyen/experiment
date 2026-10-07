@@ -124,11 +124,13 @@ export const FOOD_DENSITY_KG_PER_UNIT: Partial<Record<Good, number>> = {
 // Nutrient composition is expressed per 100 g; values are based on representative food composition data. They should be replaced with exact Ciqual entries when the simulation food list is finalized. Source: https://ciqual.anses.fr/cms/en/2025-anses-ciqual-table
 export const FOOD_NUTRITION: Partial<Record<Good, FoodNutrition>> = {
   ble: { kcal: 340, protein: 13.5, carbohydrate: 60, fat: 2.5, fiber: 10.7, vitamin_A: 0, vitamin_B1: .45, vitamin_B2: .1, vitamin_B3: 4.7, vitamin_B6: .34, vitamin_B9: 40, vitamin_B12: 0, vitamin_C: 0, vitamin_E: 1, vitamin_K: 2, calcium: 34, iron: 3.8, magnesium: 126, zinc: 2.9, iodine: 0, selenium: 70 },
-  // FAO gives about 20 mg vitamin C per 100 g raw potato. Source: https://www.fao.org/4/t0207e/T0207E07.htm\n  pomme_de_terre: { kcal: 80, protein: 1.8, carbohydrate: 16.7, fat: .3, fiber: 2.2, vitamin_A: 0, vitamin_B1: .08, vitamin_B2: .03, vitamin_B3: 1.4, vitamin_B6: .3, vitamin_B9: 17, vitamin_B12: 0, vitamin_C: 20, vitamin_E: .1, vitamin_K: 2, calcium: 12, iron: .7, magnesium: 23, zinc: .3, iodine: 0, selenium: 0 },
+  // FAO gives about 20 mg vitamin C per 100 g raw potato. Source: https://www.fao.org/4/t0207e/T0207E07.htm
+  pomme_de_terre: { kcal: 80, protein: 1.8, carbohydrate: 16.7, fat: .3, fiber: 2.2, vitamin_A: 0, vitamin_B1: .08, vitamin_B2: .03, vitamin_B3: 1.4, vitamin_B6: .3, vitamin_B9: 17, vitamin_B12: 0, vitamin_C: 20, vitamin_E: .1, vitamin_K: 2, calcium: 12, iron: .7, magnesium: 23, zinc: .3, iodine: 0, selenium: 0 },
   legumineuses: { kcal: 330, protein: 22, carbohydrate: 50, fat: 1.5, fiber: 15, vitamin_A: 5, vitamin_B1: .55, vitamin_B2: .2, vitamin_B3: 2.5, vitamin_B6: .55, vitamin_B9: 450, vitamin_B12: 0, vitamin_C: 4, vitamin_E: 2, vitamin_K: 5, calcium: 100, iron: 6.5, magnesium: 170, zinc: 3, iodine: 5, selenium: 5 },
   legumes: { kcal: 30, protein: 1.5, carbohydrate: 5, fat: .3, fiber: 3, vitamin_A: 300, vitamin_B1: .08, vitamin_B2: .05, vitamin_B3: .7, vitamin_B6: .15, vitamin_B9: 60, vitamin_B12: 0, vitamin_C: 30, vitamin_E: 1, vitamin_K: 150, calcium: 35, iron: .7, magnesium: 20, zinc: .4, iodine: 5, selenium: 1 },
   fruits: { kcal: 50, protein: .7, carbohydrate: 12, fat: .2, fiber: 2.4, vitamin_A: 50, vitamin_B1: .05, vitamin_B2: .04, vitamin_B3: .4, vitamin_B6: .1, vitamin_B9: 25, vitamin_B12: 0, vitamin_C: 35, vitamin_E: .3, vitamin_K: 5, calcium: 15, iron: .3, magnesium: 10, zinc: .2, iodine: 2, selenium: 1 },
-  // Cow milk contains about 1 mg vitamin C per 100 g. Source: https://www.fao.org/4/W0073e/w0073e03.htm\n  lait: { kcal: 46, protein: 3.3, carbohydrate: 4.8, fat: 1.5, fiber: 0, vitamin_A: 50, vitamin_B1: .04, vitamin_B2: .18, vitamin_B3: .1, vitamin_B6: .04, vitamin_B9: 5, vitamin_B12: .4, vitamin_C: 1, vitamin_E: .1, vitamin_K: 0, calcium: 120, iron: 0, magnesium: 11, zinc: .4, iodine: 15, selenium: 2 },
+  // Cow milk contains about 1 mg vitamin C per 100 g. Source: https://www.fao.org/4/W0073e/w0073e03.htm
+  lait: { kcal: 46, protein: 3.3, carbohydrate: 4.8, fat: 1.5, fiber: 0, vitamin_A: 50, vitamin_B1: .04, vitamin_B2: .18, vitamin_B3: .1, vitamin_B6: .04, vitamin_B9: 5, vitamin_B12: .4, vitamin_C: 1, vitamin_E: .1, vitamin_K: 0, calcium: 120, iron: 0, magnesium: 11, zinc: .4, iodine: 15, selenium: 2 },
   oeufs: { kcal: 143, protein: 12.6, carbohydrate: .7, fat: 9.5, fiber: 0, vitamin_A: 160, vitamin_B1: .04, vitamin_B2: .46, vitamin_B3: .1, vitamin_B6: .17, vitamin_B9: 47, vitamin_B12: 1.1, vitamin_C: 0, vitamin_E: 1.9, vitamin_K: .3, calcium: 56, iron: 1.8, magnesium: 12, zinc: 1.3, iodine: 140, selenium: 30 },
   volaille: { kcal: 190, protein: 29, carbohydrate: 0, fat: 8.5, fiber: 0, vitamin_A: 10, vitamin_B1: .07, vitamin_B2: .15, vitamin_B3: 10, vitamin_B6: .5, vitamin_B9: 6, vitamin_B12: .3, vitamin_C: 0, vitamin_E: .3, vitamin_K: 2, calcium: 15, iron: 1.2, magnesium: 25, zinc: 2.5, iodine: 5, selenium: 25 },
   porc: { kcal: 240, protein: 26, carbohydrate: 0, fat: 15, fiber: 0, vitamin_A: 0, vitamin_B1: .8, vitamin_B2: .2, vitamin_B3: 8, vitamin_B6: .5, vitamin_B9: 5, vitamin_B12: .7, vitamin_C: 0, vitamin_E: .3, vitamin_K: 2, calcium: 10, iron: 1, magnesium: 22, zinc: 3, iodine: 7, selenium: 35 },
@@ -235,7 +237,18 @@ export function updateNutritionDeficitDays(
   );
 }
 
-// Returns the nutrients whose documented lethal-duration rule has been reached.\nexport function lethalNutritionCauses(\n  deficitDays: Partial<Record<NutritionId, number>>\n): NutritionId[] {\n  return NUTRITION.filter(nutrient => {\n    const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;\n    return lethalAfterDays !== null &&\n      (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;\n  }).map(nutrient => nutrient.id);\n}\n\nexport function isLethalNutritionState(
+// Returns the nutrients whose documented lethal-duration rule has been reached.
+export function lethalNutritionCauses(
+  deficitDays: Partial<Record<NutritionId, number>>
+): NutritionId[] {
+  return NUTRITION.filter(nutrient => {
+    const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;
+    return lethalAfterDays !== null &&
+      (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;
+  }).map(nutrient => nutrient.id);
+}
+
+export function isLethalNutritionState(
   reserves: NutritionReserves,
   deficitDays: Partial<Record<NutritionId, number>>
 ): boolean {
