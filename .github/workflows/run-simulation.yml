@@ -1,5 +1,7 @@
 name: Run simulation
 
+# The CSV summary reads the population series by its stable series identifier.
+
 on:
   workflow_dispatch:
     inputs:
