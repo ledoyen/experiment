@@ -1040,6 +1040,7 @@ export class World {
       fractions[good] = demand > 0 ? Math.min(1, supply / demand) : 0;
     }
 
+    const dailyIntakeByAgent = new Map<number, Partial<Record<NutritionId, number>>>();
     for (let index = 0; index < this.agents.length; index++) {
       const agent = this.agents[index];
       const intake = {} as Partial<Record<NutritionId, number>>;
@@ -1070,6 +1071,8 @@ export class World {
         agent.metabolicFactor
       );
 
+      dailyIntakeByAgent.set(agent.id, intake);
+
       const critical = descendingIntoCritical(
         previousNutrition,
         agent.reserves
@@ -1086,7 +1089,10 @@ export class World {
 
     for (const agent of this.agents) {
       agent.nutritionDeficitDays = updateNutritionDeficitDays(
-        agent.reserves,
+        dailyIntakeByAgent.get(agent.id) ?? {},
+        agent.sex,
+        agent.state,
+        agent.metabolicFactor,
         agent.nutritionDeficitDays
       );
     }
