@@ -12,7 +12,6 @@ export interface NutritionDefinition {
   labelKey: string;
   unit: string;
   maxDays: number;
-  priority: number;
   target: Record<Sex, number>;
   pregnancy?: number;
   lactation?: number;
@@ -94,11 +93,11 @@ export const INDIVIDUAL_REQUIREMENT_VARIANCE = 0.10;
 
 // Adult reference values are based on ANSES/EFSA dietary reference values; the model keeps the initial scope intentionally small and uses sex-specific values where the source supports them. Source: https://www.anses.fr/en/system/files/NUT2012SA0103Ra-1EN.pdf
 export const NUTRITION: NutritionDefinition[] = [
-  { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 7, priority: 1, target: { male: 2500, female: 2000 } },
-  { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, priority: 2, target: { male: 58.1, female: 58.1 } },
-  { id: "carbohydrate", labelKey: "phys.carbohydrate", unit: "g", maxDays: 7, priority: 3, target: { male: 328.1, female: 262.5 } },
-  { id: "fat", labelKey: "phys.fat", unit: "g", maxDays: 7, priority: 4, target: { male: 76.4, female: 61.1 } },
-  { id: "fiber", labelKey: "phys.fiber", unit: "g", maxDays: 7, priority: 5, target: { male: 25, female: 25 } },
+  { id: "energy", labelKey: "phys.energy", unit: "kcal", maxDays: 7, target: { male: 2500, female: 2000 } },
+  { id: "protein", labelKey: "phys.protein", unit: "g", maxDays: 7, target: { male: 58.1, female: 58.1 } },
+  { id: "carbohydrate", labelKey: "phys.carbohydrate", unit: "g", maxDays: 7, target: { male: 328.1, female: 262.5 } },
+  { id: "fat", labelKey: "phys.fat", unit: "g", maxDays: 7, target: { male: 76.4, female: 61.1 } },
+  { id: "fiber", labelKey: "phys.fiber", unit: "g", maxDays: 7, target: { male: 25, female: 25 } },
   { id: "vitamin_A", labelKey: "phys.vitamin_A", unit: "µg RE", maxDays: 30, target: { male: 750, female: 650 } },
   { id: "vitamin_B1", labelKey: "phys.vitamin_B1", unit: "mg", maxDays: 30, target: { male: 1.1, female: 0.9 } },
   { id: "vitamin_B2", labelKey: "phys.vitamin_B2", unit: "mg", maxDays: 30, target: { male: 1.6, female: 1.4 } },
@@ -248,28 +247,23 @@ export function isLethalNutritionState(
 }
 
 
-export type NutritionStatusLevel = "normal" | "deficient" | "depleted";
+export type NutritionStatusLevel = "normal" | "deficient";
 
 export interface NutritionStatus {
   level: NutritionStatusLevel;
   deficient: NutritionId[];
-  depleted: NutritionId[];
 }
 
 // A reserve below one daily requirement is a simulation deficiency warning, not a clinical diagnosis.
 // WHO describes nutrient deficiencies as capable of reducing physical capacity, productivity and health.
 // Source: https://www.who.int/health-topics/micronutrients
 export function nutritionStatus(
-  reserves: NutritionReserves,
-  sex: Sex,
-  state: PhysiologyState,
-  requirementFactor = 1
+  deficitDays: Partial<Record<NutritionId, number>>
 ): NutritionStatus {
-  const deficient = NUTRITION.filter(nutrient =>
-    reserves[nutrient.id].value < targetFor(nutrient, sex, state) * requirementFactor
-  ).map(nutrient => nutrient.id);
-  const depleted = deficient.filter(id => reserves[id].value <= 0);
-  return { level: depleted.length ? "depleted" : deficient.length ? "deficient" : "normal", deficient, depleted };
+  const deficient = NUTRITION
+    .filter(nutrient => (deficitDays[nutrient.id] ?? 0) > 0)
+    .map(nutrient => nutrient.id);
+  return { level: deficient.length ? "deficient" : "normal", deficient };
 }
 
 // Work capacity is limited by depleted energy, protein, carbohydrate or fat reserves.
