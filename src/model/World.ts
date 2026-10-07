@@ -998,6 +998,23 @@ export class World {
     }
   }
 
+  private planCollectiveFoodDemand(): Array<Partial<Record<Good, number>>> {
+    const equalPrices = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, 1])
+    ) as Partial<Record<Good, number>>;
+    return this.agents.map(agent =>
+      planFoodDemand(
+        agent.reserves,
+        agent.sex,
+        agent.state,
+        Number.MAX_SAFE_INTEGER,
+        equalPrices,
+        undefined,
+        agent.metabolicFactor
+      )
+    );
+  }
+
   private processCollectiveNutritionDay(
     plans: Array<Partial<Record<Good, number>>>
   ) {
