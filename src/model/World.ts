@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, nutritionStatus, nutritionWorkCapacity, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, nutritionStatus, nutritionWorkCapacity, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
@@ -76,6 +76,7 @@ export class World {
   private runInitialParameters: Parameters;
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
+  private readonly deathCauses: Partial<Record<NutritionId, number>> = {};
 
   constructor(parameters: Parameters, options: WorldOptions = {}) {
     this.recordSnapshots = options.recordSnapshots ?? true;
@@ -1114,11 +1115,19 @@ export class World {
 this.removeDeadAgents();
   }
 
+  getDeathCauses(): Partial<Record<NutritionId, number>> {
+    return { ...this.deathCauses };
+  }
+
   private removeDeadAgents() {
     const survivors: Human[] = [];
 
     for (const agent of this.agents) {
-      if (isLethalNutritionState(agent.reserves, agent.nutritionDeficitDays)) {
+      const causes = lethalNutritionCauses(agent.nutritionDeficitDays);
+      if (causes.length > 0 && isLethalNutritionState(agent.reserves, agent.nutritionDeficitDays)) {
+        for (const nutrient of causes) {
+          this.deathCauses[nutrient] = (this.deathCauses[nutrient] ?? 0) + 1;
+        }
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
