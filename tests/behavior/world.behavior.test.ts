@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultParameters } from "../../src/data/defaults";
 import { World } from "../../src/model/World";
+import type { Parameters } from "../../src/data/types";
 
 function runDays(world: World, days: number): number[] {
   const populations: number[] = [];
@@ -11,13 +12,17 @@ function runDays(world: World, days: number): number[] {
   return populations;
 }
 
+function testWorld(parameters: Parameters): World {
+  return new World(parameters, { recordSnapshots: false });
+}
+
 function moneyInSystem(world: World): number {
   return world.getMetrics().moneySupply;
 }
 
 describe("simulation behavioral invariants", () => {
   it("keeps a nutritionally viable no-money population alive over the initial season", () => {
-    const world = new World({
+    const world = testWorld({
       ...defaultParameters(),
       population: 200,
       moneyEnabled: false,
