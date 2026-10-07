@@ -253,25 +253,39 @@ export function updateNutritionDeficitDays(
 }
 
 // Returns the nutrients whose documented lethal-duration rule has been reached.
+// A sustained intake deficit becomes lethal only when the physiological reserve is also critically depleted.
+// This prevents a short interruption of intake from killing an individual who still has stored reserves.
 export function lethalNutritionCauses(
-  deficitDays: Partial<Record<NutritionId, number>>
+  reserves: NutritionReserves,
+  deficitDays: Partial<Record<NutritionId, number>>,
+  sex: Sex,
+  state: PhysiologyState,
+  requirementFactor = 1
 ): NutritionId[] {
   return NUTRITION.filter(nutrient => {
-    const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;
-    return lethalAfterDays !== null &&
-      (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;
+    const rule = NUTRITION_MORTALITY[nutrient.id];
+    const target = targetFor(nutrient, sex, state) * requirementFactor;
+    const criticalReserve = target * rule.criticalReserveDays;
+    return rule.lethalAfterDays !== null &&
+      (deficitDays[nutrient.id] ?? 0) >= rule.lethalAfterDays &&
+      reserves[nutrient.id].value <= criticalReserve;
   }).map(nutrient => nutrient.id);
 }
 
 export function isLethalNutritionState(
   reserves: NutritionReserves,
-  deficitDays: Partial<Record<NutritionId, number>>
+  deficitDays: Partial<Record<NutritionId, number>>,
+  sex: Sex,
+  state: PhysiologyState,
+  requirementFactor = 1
 ): boolean {
-  return NUTRITION.some(nutrient => {
-    const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;
-    return lethalAfterDays !== null &&
-      (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;
-  });
+  return lethalNutritionCauses(
+    reserves,
+    deficitDays,
+    sex,
+    state,
+    requirementFactor
+  ).length > 0;
 }
 
 
