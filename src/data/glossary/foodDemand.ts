@@ -91,6 +91,7 @@ export function decidePurchases(
 ): PurchaseDecision[] {
   const decisions: PurchaseDecision[] = [];
   const needs = initialNeeds(human);
+  const workingMarket = market.map(offer => ({ ...offer }));
   let moneyLeft = Math.max(0, human.money);
 
   for (const tier of FOOD_PRIORITY_TIERS) {
@@ -103,7 +104,7 @@ export function decidePurchases(
       let bestQuantity = 0;
       let bestScore = 0;
 
-      for (const offer of cheapestFoodOffers(market, human.id)) {
+      for (const offer of cheapestFoodOffers(workingMarket, human.id)) {
         if (
           offer.sellerId === human.id ||
           offer.stock <= 1e-12 ||
@@ -179,6 +180,7 @@ export function decidePurchases(
       });
 
       moneyLeft -= bestQuantity * bestOffer.price;
+      bestOffer.stock -= bestQuantity;
 
       const contribution = foodToNutrition(
         FOOD_NUTRITION[bestOffer.name]!,
