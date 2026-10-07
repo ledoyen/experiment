@@ -120,7 +120,8 @@ jobs:
               rows = list(csv.DictReader(file))
           print(f"Final population: {len(rows)}")
           with open("simulation.csv", newline="") as file:
-              history = list(csv.DictReader(file))
+              lines = [line for line in file if not line.startswith("#")]
+              history = list(csv.DictReader(lines))
           population_series = next(row for row in history if row["series_id"] == "population")
           populations = [float(value) for value in list(population_series.values())[3:]]
           first_zero = next((index for index, population in enumerate(populations) if population == 0), None)
