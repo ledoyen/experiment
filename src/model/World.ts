@@ -737,7 +737,7 @@ export class World {
 
     for (const agent of this.agents) {
       agent.nutritionDeficitDays = updateNutritionDeficitDays(
-        intake,
+        purchasedIntake.get(agent.id) ?? {},
         agent.sex,
         agent.state,
         agent.metabolicFactor,
