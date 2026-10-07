@@ -485,7 +485,10 @@ export class World {
     );
   }
 
-  private consumeStoredFood(agent: Human, simulationDay: number) {
+  private consumeStoredFood(
+    agent: Human,
+    simulationDay: number
+  ): Partial<Record<NutritionId, number>> {
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
     ) as Partial<Record<Good, number>>;
@@ -535,34 +538,25 @@ export class World {
       );
     }
 
-    if (Object.values(intake).every(value => (value ?? 0) <= 0)) return;
+    return intake;
+  }
 
-    const previousReserves = agent.reserves;
-    agent.reserves = applyNutritionDay(
-      agent.reserves,
-      intake,
-      agent.sex,
-      agent.state,
-      agent.metabolicFactor
-    );
-
-    const critical = descendingIntoCritical(
-      previousReserves,
-      agent.reserves
-    );
-    if (critical) {
-      agent.events.push({
-        minute: simulationDay * 1440,
-        type: "healthCritical",
-        nutrient: critical.nutrient,
-        ratio: critical.ratio
-      });
+  private mergeNutritionIntake(
+    first: Partial<Record<NutritionId, number>>,
+    second: Partial<Record<NutritionId, number>>
+  ): Partial<Record<NutritionId, number>> {
+    const intake = {} as Partial<Record<NutritionId, number>>;
+    for (const nutrient of NUTRITION) {
+      intake[nutrient.id] =
+        (first[nutrient.id] ?? 0) + (second[nutrient.id] ?? 0);
     }
+    return intake;
   }
 
   private processMarketDay(simulationDay: number) {
+    const storedIntake = new Map<number, Partial<Record<NutritionId, number>>>();
     for (const agent of this.agents) {
-      this.consumeStoredFood(agent, simulationDay);
+      storedIntake.set(agent.id, this.consumeStoredFood(agent, simulationDay));
     }
 
     const prices = { ...this.prices };
@@ -633,8 +627,10 @@ export class World {
 
     const applyPurchasedNutrition = () => {
       for (const buyer of this.agents) {
-        const intake = purchasedIntake.get(buyer.id);
-        if (!intake) continue;
+        const intake = mergeNutritionIntake(
+          storedIntake.get(buyer.id) ?? {},
+          purchasedIntake.get(buyer.id) ?? {}
+        );
 
         const previousReserves = buyer.reserves;
         buyer.reserves = applyNutritionDay(
@@ -737,7 +733,10 @@ export class World {
 
     for (const agent of this.agents) {
       agent.nutritionDeficitDays = updateNutritionDeficitDays(
-        purchasedIntake.get(agent.id) ?? {},
+        mergeNutritionIntake(
+          storedIntake.get(agent.id) ?? {},
+          purchasedIntake.get(agent.id) ?? {}
+        ),
         agent.sex,
         agent.state,
         agent.metabolicFactor,
