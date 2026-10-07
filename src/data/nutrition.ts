@@ -265,10 +265,11 @@ export function lethalNutritionCauses(
   return NUTRITION.filter(nutrient => {
     const rule = NUTRITION_MORTALITY[nutrient.id];
     const target = targetFor(nutrient, sex, state) * requirementFactor;
-    const criticalReserve = target * rule.criticalReserveDays;
+    // A critical reserve is a warning state; death occurs only when the
+    // explicitly modelled physiological reserve is exhausted.
     return rule.lethalAfterDays !== null &&
       (deficitDays[nutrient.id] ?? 0) >= rule.lethalAfterDays &&
-      reserves[nutrient.id].value <= criticalReserve;
+      reserves[nutrient.id].value <= 1e-12;
   }).map(nutrient => nutrient.id);
 }
 
