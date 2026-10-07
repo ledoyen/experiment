@@ -10,6 +10,7 @@ import {
   dailyMaintenanceNeed,
   MAINTENANCE_GOODS,
   priceMultiplier,
+  seasonalProductionMultiplier,
   shouldSwitchJob,
   expectedMarginalIncome,
   jobSwitchProbability,
