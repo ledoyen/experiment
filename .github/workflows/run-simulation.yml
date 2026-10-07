@@ -109,8 +109,27 @@ jobs:
             --duration-days "$duration_days" \
             --output simulation.csv
 
-      - name: Upload simulation CSV
+      - name: Summarize final physiology
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
+        run: |
+          python3 - <<'PY'
+          import csv
+          with open("simulation-final-agents.csv", newline="") as file:
+              rows = list(csv.DictReader(file))
+          print(f"Final population: {len(rows)}")
+          for column in rows[0]:
+              if not column.endswith("_reserve"):
+                  continue
+              values = [float(row[column]) for row in rows]
+              print(f"{column}: min={min(values):.6g}, zero={sum(value <= 0 for value in values)}")
+          for column in rows[0]:
+              if column.endswith("_deficit_days"):
+                  values = [float(row[column]) for row in rows]
+                  if max(values) > 0:
+                      print(f"{column}: max={max(values):.6g}, deficient={sum(value > 0 for value in values)}")
+          PY
+
+      - name: Upload simulation CSV        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.issue.user.login == 'ledoyen') }}
         uses: actions/upload-artifact@v4
         with:
           name: simulation-csv
