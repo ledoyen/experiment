@@ -46,15 +46,17 @@ function cheapestFoodOffers(
 // Technical convergence guard for the market matching loop; it is not an economic parameter.
 export const MAX_FOOD_PURCHASE_ROUNDS = 16;
 
+// Energy is the first ration constraint; protein, fat and micronutrients must also be covered.
+ // Source: https://www.fao.org/4/y5815e/y5815e0a.htm
 export const FOOD_PRIORITY_TIERS = [
+  ["energy"] as const,
   ["protein", "carbohydrate", "fat", "fiber"] as const,
   [
     "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3",
     "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C",
     "vitamin_E", "vitamin_K",
     "calcium", "iron", "magnesium", "zinc", "iodine", "selenium"
-  ] as const,
-  ["energy"] as const
+  ] as const
 ] as const;
 
 type TierId = typeof FOOD_PRIORITY_TIERS[number][number];
