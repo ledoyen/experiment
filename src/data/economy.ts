@@ -1,5 +1,5 @@
 import type { Good, Job } from "./types";
-import { FOOD_NUTRITION, foodToNutrition, type NutritionId } from "./nutrition";
+import { FOOD_NUTRITION, NUTRITION, foodToNutrition, type NutritionId } from "./nutrition";
 import { initialPriceScale } from "./glossary/nutritionCost";
 
 export interface ActivityDefinition {
