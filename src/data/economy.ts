@@ -144,22 +144,34 @@ export const GOOD_PRICE_UNIT: Record<Good, string> = {
 // population lived in agricultural households. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
 // Purely ranks food-producing jobs by physical shortage per worker of output.
 // No monetary signal or arbitrary productivity coefficient is involved.
+type FoodActivityOutput = {
+  activity: ActivityDefinition;
+  output: Partial<Record<NutritionId, number>>;
+};
+
 export function rankFoodJobsByNutrientShortage(
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>,
   workerCount = 1
 ): Job[] {
-  const available = foodActivities();
+  const options = foodActivityOutputs();
   const result: Job[] = [];
   const projected = { ...stock };
-  for (let i = 0; i < workerCount && available.length; i++) {
+  for (let i = 0; i < workerCount && options.length; i++) {
     if (minimumNutritionCoverage(demand, projected) >= 1) break;
-    const best = bestFoodActivity(available, demand, projected);
+    const best = bestFoodActivity(options, demand, projected);
     if (!best) break;
-    result.push(best.job);
-    addWorkerNutrition(projected, best);
+    result.push(best.activity.job);
+    addWorkerNutrition(projected, best.output);
   }
   return result;
+}
+
+function foodActivityOutputs(): FoodActivityOutput[] {
+  return foodActivities().map(activity => ({
+    activity,
+    output: nutrientOutput(activity)
+  }));
 }
 
 function foodActivities() {
@@ -170,24 +182,23 @@ function foodActivities() {
 }
 
 function bestFoodActivity(
-  activities: ActivityDefinition[],
+  options: FoodActivityOutput[],
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>
 ) {
-  return activities.reduce<ActivityDefinition | undefined>((best, activity) => {
-    if (!best) return activity;
-    return nutritionCoverageAfter(activity, demand, stock) >
-      nutritionCoverageAfter(best, demand, stock) ? activity : best;
+  return options.reduce<FoodActivityOutput | undefined>((best, option) => {
+    if (!best) return option;
+    return nutritionCoverageAfter(option.output, demand, stock) >
+      nutritionCoverageAfter(best.output, demand, stock) ? option : best;
   }, undefined);
 }
 
 function nutritionCoverageAfter(
-  activity: ActivityDefinition,
+  output: Partial<Record<NutritionId, number>>,
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>
 ) {
   let coverage = 1;
-  const output = nutrientOutput(activity);
   for (const nutrient of NUTRITION) {
     const need = demand[nutrient.id] ?? 0;
     if (need <= 0) continue;
@@ -216,9 +227,8 @@ function nutrientOutput(activity: ActivityDefinition) {
 
 function addWorkerNutrition(
   stock: Partial<Record<NutritionId, number>>,
-  activity: ActivityDefinition
+  output: Partial<Record<NutritionId, number>>
 ) {
-  const output = nutrientOutput(activity);
   for (const nutrient of NUTRITION) {
     stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0);
   }
