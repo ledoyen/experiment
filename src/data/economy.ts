@@ -193,7 +193,7 @@ function nutritionCoverageAfter(
     if (need <= 0) continue;
     coverage = Math.min(
       coverage,
-      ((stock[nutrient.id] ?? 0) + output[nutrient.id]) / need
+      ((stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0)) / need
     );
   }
   return coverage;
