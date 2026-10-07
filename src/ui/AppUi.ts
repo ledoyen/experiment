@@ -1,6 +1,6 @@
 import type { Parameters, Metrics, Agent, AgentEvent, Good, Job } from "../data/types";
 import { CONSUMED_GOODS, GOODS, GOOD_PRICE_UNIT } from "../data/economy";
-import { NUTRITION, type NutritionId } from "../data/nutrition";
+import { NUTRITION, nutritionStatus, type NutritionId } from "../data/nutrition";
 import { chartTimeResolution, simulationTimeParts, estimateFoodAutonomyDays } from "../data/glossary";
 import { t } from "../i18n";
 import { World } from "../model/World";
@@ -406,6 +406,7 @@ export class AppUi {
       <div class="agent-tooltip-title">#${agent.id}</div>
       <div class="agent-row"><span>${t("sex")}</span><strong>${t(`sex.${agent.sex}`)}</strong></div>
       <div class="agent-row"><span>${t("physiologyState")}</span><strong>${t(`physiology.${agent.state}`)}</strong></div>
+      <div class="agent-row"><span>${t("nutritionStatus")}</span><strong>${this.nutritionStatusMarkup(agent)}</strong></div>
       <div class="agent-row"><span>${t("job")}</span><strong>${t(`job.${agent.job}`)}</strong></div>
       <div class="agent-row"><span>${t("productivity")}</span><strong>${formatValue(agent.productivity)}</strong></div>
       <div class="agent-row"><span>${t("money")}</span><strong>${formatValue(agent.money)}</strong></div>
@@ -444,6 +445,13 @@ export class AppUi {
           ${this.nutritionGaugeMarkup(agent, section.ids)}
         `).join("")}
       </div>`;
+  }
+
+  private nutritionStatusMarkup(agent: Agent) {
+    const status = nutritionStatus(agent.nutritionDeficitDays);
+    if (status.level === "normal") return t("nutrition.normal");
+    return t("nutrition.deficient") + ": " +
+      status.deficient.map(id => t("phys." + id)).join(", ");
   }
 
   private nutritionGaugeMarkup(agent: Agent, ids: NutritionId[]) {
