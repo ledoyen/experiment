@@ -111,13 +111,6 @@ describe("simulation behavioral invariants", () => {
       human.inventory = {};
       human.forSale = {};
       human.askPrices = {};
-      human.reserves = Object.fromEntries(
-        Object.entries(human.reserves).map(([id, reserve]) => [
-          id,
-          { ...reserve, value: reserve.max }
-        ])
-      ) as typeof human.reserves;
-      human.nutritionDeficitDays = {};
     }
 
     seller.inventory.ble = 100;
