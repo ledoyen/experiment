@@ -121,7 +121,8 @@ jobs:
           print(f"Final population: {len(rows)}")
           with open("simulation.csv", newline="") as file:
               history = list(csv.DictReader(file))
-          populations = [int(float(row["population"])) for row in history]
+          population_series = next(row for row in history if row["series_id"] == "population")
+          populations = [float(value) for value in list(population_series.values())[3:]]
           first_zero = next((index for index, population in enumerate(populations) if population == 0), None)
           print(f"First zero-population day: {first_zero}")
           if not rows:
