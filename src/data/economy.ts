@@ -36,8 +36,8 @@ export const ACTIVITIES: ActivityDefinition[] = [
   { job: "horticulture_legumes", labelKey: "job.horticulture_legumes", output: "legumes", initialWorkerShare: 0.05, annualCapacityPerWorker: 0.1, annualOutputPerCapacity: 5000, capacityUnit: "ha", competence: "horticulture" },
   // 0.3 ha/worker and 2 t/ha/year: conservative perennial-orchard output; fruit yields vary strongly by crop and year. Reference: https://www.fao.org/faostat/
   { job: "arboriculture_fruits", labelKey: "job.arboriculture_fruits", output: "fruits", initialWorkerShare: 0.04, annualCapacityPerWorker: 0.3, annualOutputPerCapacity: 2000, capacityUnit: "ha", competence: "arboriculture" },
-  // 0.5 ha/worker and 150 kg oil/ha/year: intentionally modest olive-oil output for low-input groves. Reference: https://www.fao.org/faostat/
-  { job: "oliviculture", labelKey: "job.oliviculture", output: "huile_olive", initialWorkerShare: 0.02, annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 150, capacityUnit: "ha", competence: "arboriculture" },
+  // 0.5 ha/worker and 300 kg oil/ha/year: low-input traditional groves can produce roughly 1–5 t of olives/ha; this value assumes a conservative oil yield within that range. Source: https://www.fao.org/4/i2800e/i2800e09.pdf
+  { job: "oliviculture", labelKey: "job.oliviculture", output: "huile_olive", initialWorkerShare: 0.04, annualCapacityPerWorker: 0.5, annualOutputPerCapacity: 300, capacityUnit: "ha", competence: "arboriculture" },
   // 15 cows/worker and 600 L/cow/year: extensive traditional dairy, within FAO's 330–880 L/cow/year range for extensive systems. Source: https://www.fao.org/4/x5547e/x5547e26.htm
   { job: "élevage_lait", labelKey: "job.elevage_lait", output: "lait", initialWorkerShare: 0.08, annualCapacityPerWorker: 15, annualOutputPerCapacity: 600, capacityUnit: "vache", competence: "élevage" },
   // 100 hens/worker and 6 kg eggs/hen/year (~100 eggs): this is a low-input assumption, above the 20–60 eggs/year traditional range but far below commercial layers. Source: https://www.fao.org/4/y5169e/y5169e0b.htm
