@@ -119,13 +119,6 @@ jobs:
           with open("simulation-final-agents.csv", newline="") as file:
               rows = list(csv.DictReader(file))
           print(f"Final population: {len(rows)}")
-          with open("simulation.csv", newline="") as file:
-              lines = [line for line in file if not line.startswith("#")]
-              history = list(csv.DictReader(lines))
-          population_series = next(row for row in history if row.get("series_id") == "population" or row.get("\ufeffseries_id") == "population")
-          populations = [float(value) for value in list(population_series.values())[3:]]
-          first_zero = next((index for index, population in enumerate(populations) if population == 0), None)
-          print(f"First zero-population day: {first_zero}")
           if not rows:
               raise SystemExit(0)
           for column in rows[0]:
