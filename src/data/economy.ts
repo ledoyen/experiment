@@ -220,7 +220,31 @@ function minimumNutritionCoverage(
   }));
 }
 
-// Selects the food activity that best addresses the nutrients currently below their daily targets.\n// This is a pure physical matching rule: no price, productivity or tuning coefficient is used.\nexport function bestFoodJobForDeficits(\n  deficits: Partial<Record<NutritionId, number>>\n): Job | undefined {\n  return foodActivityOutputs().reduce<FoodActivityOutput | undefined>((best, option) => {\n    if (!best) return option;\n    return nutritionDeficitCoverage(option.output, deficits) >\n      nutritionDeficitCoverage(best.output, deficits) ? option : best;\n  }, undefined)?.activity.job;\n}\n\nfunction nutritionDeficitCoverage(\n  output: Partial<Record<NutritionId, number>>,\n  deficits: Partial<Record<NutritionId, number>>\n): number {\n  const relevant = NUTRITION.filter(nutrient => (deficits[nutrient.id] ?? 0) > 0);\n  if (!relevant.length) return 0;\n  return relevant.reduce((sum, nutrient) => {\n    const deficit = deficits[nutrient.id]!;\n    return sum + Math.min(1, (output[nutrient.id] ?? 0) / deficit);\n  }, 0) / relevant.length;\n}\n\nfunction nutrientOutput(activity: ActivityDefinition) {
+// Selects the food activity that best addresses the nutrients currently below their daily targets.
+// This is a pure physical matching rule: no price, productivity or tuning coefficient is used.
+export function bestFoodJobForDeficits(
+  deficits: Partial<Record<NutritionId, number>>
+): Job | undefined {
+  return foodActivityOutputs().reduce<FoodActivityOutput | undefined>((best, option) => {
+    if (!best) return option;
+    return nutritionDeficitCoverage(option.output, deficits) >
+      nutritionDeficitCoverage(best.output, deficits) ? option : best;
+  }, undefined)?.activity.job;
+}
+
+function nutritionDeficitCoverage(
+  output: Partial<Record<NutritionId, number>>,
+  deficits: Partial<Record<NutritionId, number>>
+): number {
+  const relevant = NUTRITION.filter(nutrient => (deficits[nutrient.id] ?? 0) > 0);
+  if (!relevant.length) return 0;
+  return relevant.reduce((sum, nutrient) => {
+    const deficit = deficits[nutrient.id]!;
+    return sum + Math.min(1, (output[nutrient.id] ?? 0) / deficit);
+  }, 0) / relevant.length;
+}
+
+function nutrientOutput(activity: ActivityDefinition) {
   const food = FOOD_NUTRITION[activity.output];
   return food ? foodToNutrition(food, dailyOutputPerWorker(activity), activity.output) : {};
 }
