@@ -235,7 +235,7 @@ export function updateNutritionDeficitDays(
   );
 }
 
-export function isLethalNutritionState(
+// Returns the nutrients whose documented lethal-duration rule has been reached.\nexport function lethalNutritionCauses(\n  deficitDays: Partial<Record<NutritionId, number>>\n): NutritionId[] {\n  return NUTRITION.filter(nutrient => {\n    const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;\n    return lethalAfterDays !== null &&\n      (deficitDays[nutrient.id] ?? 0) >= lethalAfterDays;\n  }).map(nutrient => nutrient.id);\n}\n\nexport function isLethalNutritionState(
   reserves: NutritionReserves,
   deficitDays: Partial<Record<NutritionId, number>>
 ): boolean {
