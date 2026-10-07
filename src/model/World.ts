@@ -424,6 +424,24 @@ export class World {
         );
       }
 
+      if (!this.parameters.moneyEnabled) {
+        // In a collective economy, labour allocation is the stabilizing
+        // mechanism. Reallocate before production so a detected food shortage
+        // changes today's output rather than waiting until after consumption.
+        const plans = this.agents.map(agent =>
+          planFoodDemand(
+            agent.reserves,
+            agent.sex,
+            agent.state,
+            Number.MAX_SAFE_INTEGER,
+            Object.fromEntries(FOOD_GOODS.map(good => [good, 1])) as Partial<Record<Good, number>>,
+            undefined,
+            agent.metabolicFactor
+          )
+        );
+        this.reallocateCollectiveFoodWork(plans);
+      }
+
       this.produceForDay(simulationDay);
 
       if (this.parameters.moneyEnabled) {
@@ -1009,12 +1027,6 @@ export class World {
         agent.metabolicFactor
       )
     );
-
-    // Without money, scarce labour is redirected toward food when physical
-    // stocks cannot cover physiological demand. The 67% ceiling is historical,
-    // not a calibration coefficient: France had 67% of its population living
-    // from agriculture in 1789. Source: https://www.bnsp.insee.fr/ark:/12148/bc6p06zm18h/f1.pdf
-    this.reallocateCollectiveFoodWork(plans);
 
     const fractions = {} as Record<Good, number>;
 
