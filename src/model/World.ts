@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, nutritionStatus, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
@@ -538,18 +538,6 @@ export class World {
       );
     }
 
-    return intake;
-  }
-
-  private mergeNutritionIntake(
-    first: Partial<Record<NutritionId, number>>,
-    second: Partial<Record<NutritionId, number>>
-  ): Partial<Record<NutritionId, number>> {
-    const intake = {} as Partial<Record<NutritionId, number>>;
-    for (const nutrient of NUTRITION) {
-      intake[nutrient.id] =
-        (first[nutrient.id] ?? 0) + (second[nutrient.id] ?? 0);
-    }
     return intake;
   }
 
