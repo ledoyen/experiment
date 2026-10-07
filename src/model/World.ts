@@ -424,22 +424,11 @@ export class World {
         );
       }
 
+      let collectivePlans: Array<Partial<Record<Good, number>>> | undefined;
       if (!this.parameters.moneyEnabled) {
-        // In a collective economy, labour allocation is the stabilizing
-        // mechanism. Reallocate before production so a detected food shortage
-        // changes today's output rather than waiting until after consumption.
-        const plans = this.agents.map(agent =>
-          planFoodDemand(
-            agent.reserves,
-            agent.sex,
-            agent.state,
-            Number.MAX_SAFE_INTEGER,
-            Object.fromEntries(FOOD_GOODS.map(good => [good, 1])) as Partial<Record<Good, number>>,
-            undefined,
-            agent.metabolicFactor
-          )
-        );
-        this.reallocateCollectiveFoodWork(plans);
+        // Allocate food labour before production so a shortage can change output today.
+        collectivePlans = this.planCollectiveFoodDemand();
+        this.reallocateCollectiveFoodWork(collectivePlans);
       }
 
       this.produceForDay(simulationDay);
