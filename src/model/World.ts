@@ -899,7 +899,7 @@ export class World {
         agent.money,
         plannedFoodSpend,
         energyRatio
-      ) || nutritionStatus(agent.reserves, agent.sex, agent.state, agent.metabolicFactor).level === "depleted";
+      ) || nutritionStatus(agent.nutritionDeficitDays).level === "depleted";
 
       if (currentMinute < agent.nextJobReviewMinute && !urgentReview) continue;
 
@@ -1002,7 +1002,6 @@ export class World {
     // Before money, allocation is still constrained by the same real stocks,
     // but there is no price or monetary budget: people take food according to
     // their current physiological needs.
-const population = Math.max(1, this.agents.length);
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
     ) as Partial<Record<Good, number>>;
