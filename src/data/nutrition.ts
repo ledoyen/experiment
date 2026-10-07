@@ -169,6 +169,19 @@ export function createNutritionReserves(
 }
 
 // Pure daily reserve update: intake replenishes the reserve and the physiological target consumes it.
+// Pure addition of nutrient intake from independent food sources.
+export function mergeNutritionIntake(
+  first: Partial<Record<NutritionId, number>>,
+  second: Partial<Record<NutritionId, number>>
+): Partial<Record<NutritionId, number>> {
+  const intake = {} as Partial<Record<NutritionId, number>>;
+  for (const nutrient of NUTRITION) {
+    intake[nutrient.id] =
+      (first[nutrient.id] ?? 0) + (second[nutrient.id] ?? 0);
+  }
+  return intake;
+}
+
 export function applyNutritionDay(
   reserves: NutritionReserves,
   intake: Partial<Record<NutritionId, number>>,
