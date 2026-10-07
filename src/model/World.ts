@@ -1,5 +1,5 @@
-import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, nutritionStatus, nutritionWorkCapacity, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
+import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage, bestFoodJobForDeficits } from "../data/economy";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, targetFor, nutritionStatus, nutritionWorkCapacity, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
@@ -736,6 +736,13 @@ export class World {
 
     applyPurchasedNutrition();
 
+    for (const agent of this.agents) {
+      agent.nutritionDeficitDays = updateNutritionDeficitDays(
+        agent.reserves,
+        agent.nutritionDeficitDays
+      );
+    }
+
     // Heating has a physical stock target and is bought from the cheapest
     // individual offers after food has been settled.
     for (const buyer of buyers) {
@@ -987,11 +994,28 @@ export class World {
     }
 
     const candidates = this.agents.filter(agent =>
-      !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
+      !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good)) &&
+      agent.nutritionDeficitDays &&
+      Object.keys(agent.nutritionDeficitDays).some(id =>
+        (agent.nutritionDeficitDays[id as NutritionId] ?? 0) > 0
+      )
     );
+
+    for (const agent of candidates) {
+      const deficits = Object.fromEntries(
+        NUTRITION.map(nutrient => [
+          nutrient.id,
+          Math.max(0, targetFor(nutrient, agent.sex, agent.state) *
+            agent.metabolicFactor - agent.reserves[nutrient.id].value)
+        ])
+      ) as Partial<Record<NutritionId, number>>;
+      const job = bestFoodJobForDeficits(deficits);
+      if (job) agent.job = job;
+    }
+
     const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
     for (let index = 0; index < rankedJobs.length; index++) {
-      candidates[index].job = rankedJobs[index];
+      if (candidates[index].job === undefined) candidates[index].job = rankedJobs[index];
     }
   }
 
