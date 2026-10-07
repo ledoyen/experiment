@@ -737,7 +737,10 @@ export class World {
 
     for (const agent of this.agents) {
       agent.nutritionDeficitDays = updateNutritionDeficitDays(
-        agent.reserves,
+        intake,
+        agent.sex,
+        agent.state,
+        agent.metabolicFactor,
         agent.nutritionDeficitDays
       );
     }
