@@ -982,13 +982,11 @@ export class World {
       }
     }
 
-    const candidates = this.agents
-      .filter(agent =>
-        !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
-      )
-      // Collective food work is the survival-critical allocation. Production is
-      // proportional to individual productivity, so the allocation must use the
-      // same information rather than assigning jobs in arbitrary agent order.
+    // When physical food coverage is insufficient, the whole workforce is
+    // eligible for reassignment. Restricting the search to non-food workers
+    // can leave a low-productivity food workforce untouched while a more
+    // productive worker remains in a non-essential activity.
+    const candidates = [...this.agents]
       .sort((a, b) => b.productivity - a.productivity);
     const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
     for (let index = 0; index < rankedJobs.length; index++) {
