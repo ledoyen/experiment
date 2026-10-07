@@ -15,15 +15,15 @@ export interface ActivityDefinition {
 }
 
 /**
- * Production pré-industrielle.
+ * Pre-industrial production.
  *
- * Chaque activité est décrite par deux choses simples :
- * - la capacité qu'un travailleur peut gérer pendant un an ;
- * - la production annuelle de cette capacité.
+ * Each activity is described by two simple quantities:
+ * - the capacity one worker can manage for one year;
+ * - the annual output of that capacity.
  *
- * Exemple : 15 vaches × 600 L/vache/an = 9 000 L de lait/an.
- * Les valeurs sont volontairement prudentes : pas de tracteur,
- * engrais minéral, pesticide ou sélection animale moderne.
+ * Example: 15 cows × 600 L/cow/year = 9,000 L of milk/year.
+ * Values are deliberately conservative: no tractor, mineral fertilizer,
+ * pesticide, or modern animal selection.
  */
 export const ACTIVITIES: ActivityDefinition[] = [
   // 1 ha × 1,200 kg/ha/year: conservative preindustrial grain yield. Medieval wheat yields around 0.5 t/ha are documented by 1200; this value is intentionally above that lower bound but below modern yields. Source: https://ndl.ethernet.edu.et/bitstream/123456789/62597/1/Vaclav%20Smil_2013.pdf
