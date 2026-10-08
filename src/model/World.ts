@@ -1015,6 +1015,18 @@ export class World {
     const equalPrices = Object.fromEntries(
       FOOD_GOODS.map(good => [good, 1])
     ) as Partial<Record<Good, number>>;
+    const population = Math.max(1, this.agents.length);
+    const perAgentCaps = Object.fromEntries(
+      FOOD_GOODS.map(good => [
+        good,
+        this.inventoryTotal(good) / population
+      ])
+    ) as Partial<Record<Good, number>>;
+
+    // A collective ration must respect the real stock of each good while
+    // choosing the basket. Without these caps, the planner always selects
+    // the nutritionally cheapest staple (wheat) and only discovers the
+    // shortage after that stock has already been exhausted.
     return this.agents.map(agent =>
       planFoodDemand(
         agent.reserves,
@@ -1022,7 +1034,7 @@ export class World {
         agent.state,
         Number.MAX_SAFE_INTEGER,
         equalPrices,
-        undefined,
+        perAgentCaps,
         agent.metabolicFactor
       )
     );
