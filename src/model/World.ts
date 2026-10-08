@@ -1002,11 +1002,12 @@ export class World {
       }
     }
 
-    const candidates = this.agents
-      .filter(agent =>
-        !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
-      )
-      .sort((left, right) => right.productivity - left.productivity);
+    // When food is scarce, existing food workers must be able to switch crops
+    // or livestock as well. Restricting candidates to non-food workers can
+    // leave the workforce producing the wrong food indefinitely.
+    const candidates = [...this.agents].sort(
+      (left, right) => right.productivity - left.productivity
+    );
     const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
