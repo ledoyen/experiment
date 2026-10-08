@@ -619,11 +619,24 @@ function niceAxis(minValue: number, maxValue: number, ticks = 5) {
 
   if (minValue === maxValue) {
     const max = maxValue <= 0 ? 1 : maxValue;
-    return { min: 0, max, step: max / (ticks - 1) };
+    const range = max;
+    const exponent = Math.floor(Math.log10(Math.max(range, 1e-9)));
+    const base = Math.pow(10, exponent);
+    const normalized = range / base;
+    const niceStep =
+      normalized <= 1 ? 1 :
+      normalized <= 2 ? 2 :
+      normalized <= 5 ? 5 : 10;
+    const step = niceStep * base;
+    return { min: 0, max: Math.max(step, Math.ceil(max / step) * step), step };
   }
 
-  const range = maxValue - minValue;
-  const exponent = Math.floor(Math.log10(Math.max(range, 1e-9)));
+  // Positive series use a zero baseline. Compute the tick spacing from the
+  // resulting axis range, not from the tiny variation around that baseline.
+  // Otherwise values such as 199..200 produce 201 one-unit ticks.
+  const baselineMin = minValue >= 0 ? 0 : minValue;
+  const range = Math.max(maxValue - baselineMin, 1e-9);
+  const exponent = Math.floor(Math.log10(range));
   const base = Math.pow(10, exponent);
   const normalized = range / base;
   const niceStep =
@@ -632,11 +645,8 @@ function niceAxis(minValue: number, maxValue: number, ticks = 5) {
     normalized <= 5 ? 5 : 10;
 
   const step = niceStep * base;
-  let min = Math.floor(minValue / step) * step;
-  let max = Math.ceil(maxValue / step) * step;
-
-  if (minValue >= 0) min = 0;
-  if (max <= min) max = min + step * (ticks - 1);
+  const min = baselineMin >= 0 ? 0 : Math.floor(minValue / step) * step;
+  const max = Math.max(min + step * (ticks - 1), Math.ceil(maxValue / step) * step);
 
   return { min, max, step };
 }
