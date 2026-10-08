@@ -1002,9 +1002,11 @@ export class World {
       }
     }
 
-    const candidates = this.agents.filter(agent =>
-      !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
-    );
+    const candidates = this.agents
+      .filter(agent =>
+        !FOOD_GOODS.includes(activityByJob(agent.job)?.output ?? ("logement" as Good))
+      )
+      .sort((left, right) => right.productivity - left.productivity);
     const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
