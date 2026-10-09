@@ -26,17 +26,17 @@ import type {
 } from "../types";
 
 function cheapestFoodOffers(
-  market: readonly AvailableGood[],
-  buyerId: number
+  offersByGood: Map<Good, AvailableGood[]>,
+  cursors: Map<Good, number>
 ): AvailableGood[] {
-  const cheapest = new Map<Good, AvailableGood>();
-  for (const offer of market) {
-    if (offer.sellerId === buyerId || offer.stock <= 1e-12) continue;
-    if (!FOOD_NUTRITION[offer.name] || !Number.isFinite(offer.price) || offer.price <= 0) continue;
-    const current = cheapest.get(offer.name);
-    if (!current || offer.price < current.price) cheapest.set(offer.name, offer);
+  const cheapest: AvailableGood[] = [];
+  for (const [good, offers] of offersByGood) {
+    let cursor = cursors.get(good) ?? 0;
+    while (cursor < offers.length && offers[cursor].stock <= 1e-12) cursor++;
+    cursors.set(good, cursor);
+    if (cursor < offers.length) cheapest.push(offers[cursor]);
   }
-  return [...cheapest.values()];
+  return cheapest;
 }
 
 // Macronutrients and micronutrients are solved before the final energy fill.
@@ -93,7 +93,25 @@ export function decidePurchases(
 ): PurchaseDecision[] {
   const decisions: PurchaseDecision[] = [];
   const needs = initialNeeds(human);
-  const workingMarket = market.map(offer => ({ ...offer }));
+  const workingMarket = market
+    .filter(offer =>
+      offer.sellerId !== human.id &&
+      offer.stock > 1e-12 &&
+      FOOD_NUTRITION[offer.name] &&
+      Number.isFinite(offer.price) &&
+      offer.price > 0
+    )
+    .map(offer => ({ ...offer }))
+    .sort((left, right) =>
+      left.name.localeCompare(right.name) || left.price - right.price
+    );
+  const offersByGood = new Map<Good, AvailableGood[]>();
+  for (const offer of workingMarket) {
+    const offers = offersByGood.get(offer.name) ?? [];
+    offers.push(offer);
+    offersByGood.set(offer.name, offers);
+  }
+  const offerCursors = new Map<Good, number>();
   let moneyLeft = Math.max(0, human.money);
 
   for (const tier of FOOD_PRIORITY_TIERS) {
@@ -106,7 +124,7 @@ export function decidePurchases(
       let bestQuantity = 0;
       let bestScore = 0;
 
-      for (const offer of cheapestFoodOffers(workingMarket, human.id)) {
+      for (const offer of cheapestFoodOffers(offersByGood, offerCursors)) {
         if (
           offer.sellerId === human.id ||
           offer.stock <= 1e-12 ||
