@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { defaultParameters } from "../../src/data/defaults";
+import { FOOD_GOODS, INITIAL_PRICE } from "../../src/data/economy";
+import {
+  FOOD_NUTRITION,
+  NUTRITION,
+  createNutritionReserves,
+  foodToNutrition
+} from "../../src/data/nutrition";
+import { planFoodDemand } from "../../src/data/glossary/foodDemand";
 import { World } from "../../src/model/World";
-import type { Parameters } from "../../src/data/types";
+import type { Good, Parameters } from "../../src/data/types";
 
 function runDays(world: World, days: number): number[] {
   const populations: number[] = [];
@@ -21,6 +29,25 @@ function moneyInSystem(world: World): number {
 }
 
 describe("simulation behavioral invariants", () => {
+  it("keeps the planned food basket within one day's energy requirement", () => {
+    const reserves = createNutritionReserves("male", "normal", 1);
+    const basket = planFoodDemand(
+      reserves,
+      "male",
+      "normal",
+      Number.MAX_SAFE_INTEGER,
+      INITIAL_PRICE
+    );
+
+    const energy = FOOD_GOODS.reduce((total, good) => {
+      const quantity = basket[good] ?? 0;
+      const food = FOOD_NUTRITION[good];
+      return total + (food ? foodToNutrition(food, quantity, good).energy ?? 0 : 0);
+    }, 0);
+    const dailyEnergyTarget = NUTRITION.find(nutrient => nutrient.id === "energy")!.target.male;
+
+    expect(energy).toBeLessThanOrEqual(dailyEnergyTarget + 1e-6);
+  });
   it("keeps a nutritionally viable no-money population alive over the initial season", () => {
     const world = testWorld({
       ...defaultParameters(),
