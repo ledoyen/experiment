@@ -13,7 +13,8 @@ function csvCell(value: string | number): string {
 
 function buildDeathLogCsv(records: DeathRecord[]): string {
   const headers = [
-    "minute", "day", "agent_id", "job", "money", "causes", "reserves", "deficit_days"
+    "minute", "day", "agent_id", "job", "money", "causes", "reserves",
+    "deficit_days", "inventory", "for_sale"
   ];
   const rows = records.map(record => [
     record.minute,
@@ -23,7 +24,9 @@ function buildDeathLogCsv(records: DeathRecord[]): string {
     record.money,
     record.causes.join(";"),
     JSON.stringify(record.reserves),
-    JSON.stringify(record.deficitDays)
+    JSON.stringify(record.deficitDays),
+    JSON.stringify(record.inventory),
+    JSON.stringify(record.forSale)
   ]);
   return [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\n") + "\n";
 }
