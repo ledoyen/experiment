@@ -899,9 +899,9 @@ export class World {
 
       const supply = offeredStock[good] ?? 0;
       // A price cannot be discovered from transactions when nobody offers
-      // the good. Scarcity is already reflected in marginal sale income for
-      // career changes, so do not compound reference prices on zero volume.
-      if (demand <= 0 || supply <= 1e-9) continue;
+      // the good. With positive supply, zero solvent demand is still a signal
+      // of overpricing and must be allowed to lower the reference price.
+      if (supply <= 1e-9) continue;
 
       this.prices[good] = priceMultiplier(
         this.prices[good],
