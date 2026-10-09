@@ -1,6 +1,20 @@
 import type { Good, Job } from "./types";
-import { FOOD_NUTRITION, NUTRITION, foodToNutrition, type NutritionId } from "./nutrition";
-import { initialPriceScale } from "./glossary/nutritionCost";
+import {
+  FOOD_NUTRITION,
+  INITIAL_RESERVE_MIN_RATIO,
+  NUTRITION,
+  createNutritionReserves,
+  foodToNutrition,
+  type NutritionId
+} from "./nutrition";
+import { planFoodDemand } from "./glossary/foodDemand";
+import { heatingPurchaseNeed } from "./glossary/heating";
+import { dailyMaintenanceNeed } from "./glossary/maintenance";
+import {
+  costOfNutritionallyCompleteDiet,
+  initialPriceScale,
+  NUTRITION_PRICE_CALIBRATION_ROUNDS
+} from "./glossary/nutritionCost";
 
 export interface ActivityDefinition {
   job: Exclude<Job, "idle">;
@@ -100,13 +114,107 @@ export const CONSUMED_GOODS: Good[] = [
   "huile_olive", "lait", "oeufs", "poisson", "vetement", "chauffage", "outil"
 ];
 
-const RAW_INITIAL_PRICE: Partial<Record<Good, number>> = {
+const RAW_PRICE_SEED: Partial<Record<Good, number>> = {
   ble: 110.8360672146801, pomme_de_terre: 11.08360672146801, legumineuses: 110.8360672146801,
   legumes: 11.08360672146801, fruits: 22.16721344293602, huile_olive: 307.8779644852224,
   lait: 4.105039526469632, oeufs: 1.970418972705424, poisson: 59.11256918116271,
   vetement: 3694.535573822669, chauffage: 3694.535573822669, outil: 738.9071147645338,
   logement: 5541.803360734004
 };
+
+function initialNutritionalDemand(
+  prices: Partial<Record<Good, number>>
+): Partial<Record<Good, number>> {
+  const male = planFoodDemand(
+    createNutritionReserves("male", "normal", INITIAL_RESERVE_MIN_RATIO),
+    "male",
+    "normal",
+    Number.MAX_SAFE_INTEGER,
+    prices
+  );
+  const female = planFoodDemand(
+    createNutritionReserves("female", "normal", INITIAL_RESERVE_MIN_RATIO),
+    "female",
+    "normal",
+    Number.MAX_SAFE_INTEGER,
+    prices
+  );
+  const demand: Partial<Record<Good, number>> = {};
+  for (const good of GOODS) {
+    demand[good] = ((male[good] ?? 0) + (female[good] ?? 0)) / 2;
+  }
+  demand.vetement = dailyMaintenanceNeed("vetement");
+  demand.outil = dailyMaintenanceNeed("outil");
+  demand.chauffage = heatingPurchaseNeed(1, 0);
+  return demand;
+}
+
+function calibrateInitialRawPrices(
+  seedPrices: Partial<Record<Good, number>>
+): Partial<Record<Good, number>> {
+  const prices = { ...seedPrices };
+
+  // The daily diet cost is the monetary numeraire. Calibrate each active
+  // producer's expected revenue against that same cost, using documented
+  // daily output, the initial labor share, and the model's actual demand plan.
+  // This avoids an arbitrary raw-price disparity making some essential jobs
+  // unable to afford food even when their output is sold as expected.
+  for (let round = 0; round < NUTRITION_PRICE_CALIBRATION_ROUNDS; round++) {
+    const demand = initialNutritionalDemand(prices);
+    const targetIncome = Math.max(
+      costOfNutritionallyCompleteDiet("male", "normal", prices),
+      costOfNutritionallyCompleteDiet("female", "normal", prices),
+      1e-9
+    );
+    const updated = { ...prices };
+    let largestLogChange = 0;
+
+    for (const activity of ACTIVITIES) {
+      if (
+        activity.dormant ||
+        activity.initialWorkerShare <= 0 ||
+        activity.annualCapacityPerWorker <= 0
+      ) continue;
+
+      const output = dailyOutputPerWorker(activity);
+      const populationShare = activity.initialWorkerShare / Math.max(ACTIVE_WORKER_SHARE, 1e-9);
+      const supplyPerPerson = populationShare * output;
+      const demandPerPerson = demand[activity.output] ?? 0;
+      if (
+        !Number.isFinite(output) || output <= 0 ||
+        !Number.isFinite(supplyPerPerson) || supplyPerPerson <= 0 ||
+        !Number.isFinite(demandPerPerson) || demandPerPerson <= 1e-12
+      ) continue;
+
+      // For a large population, demand/supply approximates the fraction of a
+      // marginal worker's output that can be sold. Both totals scale with
+      // population, so this calibration does not assume a fixed population.
+      const saleFraction = Math.min(1, demandPerPerson / supplyPerPerson);
+      const targetPrice = targetIncome / (output * saleFraction);
+      const currentPrice = prices[activity.output] ?? targetPrice;
+      if (
+        !Number.isFinite(targetPrice) || targetPrice <= 0 ||
+        !Number.isFinite(currentPrice) || currentPrice <= 0
+      ) continue;
+
+      // Geometric relaxation makes this multiplicative price calibration
+      // converge without adding a behavioral tuning parameter.
+      const nextPrice = Math.sqrt(currentPrice * targetPrice);
+      updated[activity.output] = nextPrice;
+      largestLogChange = Math.max(
+        largestLogChange,
+        Math.abs(Math.log(nextPrice / currentPrice))
+      );
+    }
+
+    Object.assign(prices, updated);
+    if (largestLogChange < 1e-6) break;
+  }
+
+  return prices;
+}
+
+const RAW_INITIAL_PRICE = calibrateInitialRawPrices(RAW_PRICE_SEED);
 
 export const NUTRITIONALLY_CALIBRATED_PRICE_SCALE = initialPriceScale(RAW_INITIAL_PRICE);
 
