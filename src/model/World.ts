@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, targetFor, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
@@ -76,7 +76,6 @@ export class World {
   private runInitialParameters: Parameters;
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
-  private foodEmergencyActive = false;
   private readonly deathCauses: Partial<Record<NutritionId, number>> = {};
 
   constructor(parameters: Parameters, options: WorldOptions = {}) {
@@ -91,7 +90,6 @@ export class World {
     this.prices = { ...INITIAL_PRICE };
     this.moneySupplyTarget = this.parameters.population * this.parameters.initialMoney;
     this.monetaryReserve = 0;
-    this.foodEmergencyActive = false;
     this.history.length = 0;
     this.snapshots.length = 0;
     this.parameterEvents.length = 0;
@@ -437,36 +435,6 @@ export class World {
         // Allocate food labour before production so a shortage can change output today.
         collectivePlans = this.planCollectiveFoodDemand();
         this.reallocateCollectiveFoodWork(collectivePlans);
-      } else {
-        // In a monetary economy, profit-only career choices can ignore people
-        // whose purchasing power has collapsed. If physiology shows a real
-        // nutritional deficit, temporarily prioritize the food activities
-        // needed to meet population-wide nutrient demand before production.
-        const emergencyFoodReallocation = this.agents.some(agent =>
-          nutritionStatus(agent.nutritionDeficitDays).level === "deficient" ||
-          (agent.reserves.energy.max > 0 &&
-            agent.reserves.energy.value / agent.reserves.energy.max <= 0.45)
-        );
-        if (emergencyFoodReallocation && !this.foodEmergencyActive) {
-          const equalPrices = Object.fromEntries(
-            FOOD_GOODS.map(good => [good, 1])
-          ) as Partial<Record<Good, number>>;
-          const nutritionalPlans = this.agents.map(agent =>
-            planFoodDemand(
-              agent.reserves,
-              agent.sex,
-              agent.state,
-              Number.MAX_SAFE_INTEGER,
-              equalPrices,
-              undefined,
-              agent.metabolicFactor
-            )
-          );
-          this.reallocateCollectiveFoodWork(nutritionalPlans);
-          this.foodEmergencyActive = true;
-        } else if (!emergencyFoodReallocation) {
-          this.foodEmergencyActive = false;
-        }
       }
 
       this.produceForDay(simulationDay);
@@ -990,6 +958,36 @@ export class World {
           best = income;
           bestJob = job;
         }
+      }
+
+      if (urgentReview) {
+        // Survival needs take precedence over expected revenue during an
+        // emergency review. Choose a food activity that best covers energy
+        // and the nutrients this individual is currently deficient in.
+        const deficient = nutritionStatus(agent.nutritionDeficitDays).deficient;
+        const required = [...new Set<NutritionId>(["energy", ...deficient])];
+        let bestCoverage = -1;
+        for (const activity of ACTIVITIES) {
+          if (activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
+          const food = FOOD_NUTRITION[activity.output];
+          if (!food) continue;
+          const output = dailyOutputPerWorker(activity) *
+            agent.productivity *
+            seasonalProductionMultiplier(activity.job, simulationDay);
+          const contribution = foodToNutrition(food, output, activity.output);
+          const coverage = Math.min(...required.map(nutrientId => {
+            const nutrient = NUTRITION.find(item => item.id === nutrientId);
+            const target = nutrient
+              ? targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor
+              : 1;
+            return (contribution[nutrientId] ?? 0) / Math.max(1e-9, target);
+          }));
+          if (coverage > bestCoverage) {
+            bestCoverage = coverage;
+            bestJob = activity.job;
+          }
+        }
+        best = expectedIncome(agent, bestJob);
       }
 
       // Emergency reviews exist to prevent a delayed career response from
