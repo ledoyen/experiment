@@ -626,6 +626,19 @@ export class World {
         (offeredStock[offer.name] ?? 0) + offer.stock;
     }
 
+    // Market inventory is a temporary buffer, not sustainable daily output.
+    // Career and price signals must use actual production flows so initial
+    // household reserves do not make food-producing jobs look unprofitable.
+    const productionSupply = {} as Record<Good, number>;
+    for (const good of Object.keys(this.prices) as Good[]) productionSupply[good] = 0;
+    for (const agent of this.agents) {
+      const activity = activityByJob(agent.job);
+      if (!activity || activity.dormant) continue;
+      const output = dailyOutputPerWorker(activity) * agent.productivity;
+      if (!Number.isFinite(output) || output <= 0) continue;
+      productionSupply[activity.output] += output;
+    }
+
     const latentFoodDemand = {} as Record<Good, number>;
     const laborFoodDemand = {} as Record<Good, number>;
     for (const good of FOOD_GOODS) {
@@ -940,15 +953,18 @@ export class World {
               this.agents.length
             : latentFoodDemand[good] ?? 0;
 
-      const supply = offeredStock[good] ?? 0;
-      // A price cannot be discovered from transactions when nobody offers
-      // the good. With positive supply, zero solvent demand is still a signal
-      // of overpricing and must be allowed to lower the reference price.
-      if (supply <= 1e-9) continue;
+      const effectiveDemand = FOOD_GOODS.includes(good)
+        ? Math.max(demand, laborFoodDemand[good] ?? 0)
+        : demand;
+      const supply = productionSupply[good] ?? 0;
+      // Price discovery follows daily production rather than accumulated
+      // inventory. Unsatisfied physiological demand must still signal scarcity
+      // when buyers are insolvent or no producer currently supplies the good.
+      if (supply <= 1e-9 && effectiveDemand <= 1e-9) continue;
 
       this.prices[good] = priceMultiplier(
         this.prices[good],
-        demand,
+        effectiveDemand,
         supply,
         this.parameters.priceSensitivity
       );
@@ -979,7 +995,7 @@ export class World {
       const good = activity.output;
       const demand = dailyDemand[good] ?? 0;
 
-      const currentSupply = offeredStock[good] ?? 0;
+      const currentSupply = productionSupply[good] ?? 0;
       const transactionPrice =
         tradeVolume[good] > 0
           ? tradeValue[good] / tradeVolume[good]
@@ -1039,59 +1055,18 @@ export class World {
         }
       }
 
-      if (survivalEmergency) {
-        // Survival needs take precedence over expected revenue during an
-        // emergency review. Prioritize the longest-running nutrient deficit
-        // alongside energy, rather than requiring one food to cover every
-        // simultaneous shortfall at once.
-        const priorityNutrient = deficientNutrients.reduce<NutritionId | null>(
-          (priority, nutrientId) =>
-            priority === null ||
-            (agent.nutritionDeficitDays[nutrientId] ?? 0) >
-              (agent.nutritionDeficitDays[priority] ?? 0)
-              ? nutrientId
-              : priority,
-          lowestReserveNutrient ?? null
-        );
-        const required = [...new Set<NutritionId>([
-          "energy",
-          ...(priorityNutrient ? [priorityNutrient] : [])
-        ])];
-        let bestCoverage = -1;
-        for (const activity of ACTIVITIES) {
-          if (activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
-          const food = FOOD_NUTRITION[activity.output];
-          if (!food) continue;
-          const output = dailyOutputPerWorker(activity) *
-            agent.productivity *
-            seasonalProductionMultiplier(activity.job, simulationDay);
-          const contribution = foodToNutrition(food, output, activity.output);
-          const coverage = Math.min(...required.map(nutrientId => {
-            const nutrient = NUTRITION.find(item => item.id === nutrientId);
-            const target = nutrient
-              ? targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor
-              : 1;
-            return (contribution[nutrientId] ?? 0) / Math.max(1e-9, target);
-          }));
-          if (coverage > bestCoverage) {
-            bestCoverage = coverage;
-            bestJob = activity.job;
-          }
-        }
-        best = expectedIncome(agent, bestJob);
-      }
 
-      // Emergency reviews exist to prevent a delayed career response from
-      // turning a food-budget or health crisis into an irreversible death.
-      // Apply the best viable switch immediately during an urgent review;
-      // retain probabilistic mobility for ordinary career changes.
+      // A physiological emergency triggers an immediate review, but it does
+      // not make every affected person choose the same food activity. Aggregate
+      // production planning handles essential foods; individual career moves
+      // retain the model's mobility probability to avoid synchronized job waves.
       if (
         bestJob !== agent.job &&
-        (urgentReview || Math.random() < jobSwitchProbability(
+        Math.random() < jobSwitchProbability(
           current,
           best,
           this.parameters.mobility
-        ))
+        )
       ) {
         const previousJob = agent.job;
         const previousIncome = current;
@@ -1152,16 +1127,8 @@ export class World {
         }
       }
 
-      for (const good of FOOD_GOODS) {
-        const quantity = agent.inventory[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
-        }
-      }
-
+      // Count daily production, not accumulated inventories. Stored food can
+      // bridge a temporary shock, but it cannot satisfy a recurring daily need.
       const activity = activityByJob(agent.job);
       if (!activity || activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
       const output = dailyOutputPerWorker(activity) * agent.productivity *
