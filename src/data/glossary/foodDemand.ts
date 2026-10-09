@@ -70,7 +70,12 @@ function dailyIntakeNeed(
   requirementFactor: number
 ): number {
   const target = targetFor(nutrientId, sex, state) * requirementFactor;
-  return Math.max(target, reserve.max - reserve.value);
+  // Daily intake must cover today's physiological target plus gradual reserve
+  // recovery. Requiring the entire reserve deficit in one day creates runaway
+  // demand precisely when a person is already malnourished.
+  const recovery = Math.max(0, reserve.max - reserve.value) /
+    Math.max(1, reserve.maxDays);
+  return target + recovery;
 }
 
 function initialNeeds(human: Human) {
