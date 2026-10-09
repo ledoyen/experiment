@@ -89,7 +89,8 @@ function initialNeeds(human: Human) {
 
 export function decidePurchases(
   human: Human,
-  market: readonly AvailableGood[]
+  market: readonly AvailableGood[],
+  offersAreSorted = false
 ): PurchaseDecision[] {
   const decisions: PurchaseDecision[] = [];
   const needs = initialNeeds(human);
@@ -101,10 +102,12 @@ export function decidePurchases(
       Number.isFinite(offer.price) &&
       offer.price > 0
     )
-    .map(offer => ({ ...offer }))
-    .sort((left, right) =>
+    .map(offer => ({ ...offer }));
+  if (!offersAreSorted) {
+    workingMarket.sort((left, right) =>
       left.name.localeCompare(right.name) || left.price - right.price
     );
+  }
   const offersByGood = new Map<Good, AvailableGood[]>();
   for (const offer of workingMarket) {
     const offers = offersByGood.get(offer.name) ?? [];
