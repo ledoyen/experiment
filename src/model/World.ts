@@ -852,7 +852,10 @@ export class World {
             : latentFoodDemand[good] ?? 0;
 
       const supply = offeredStock[good] ?? 0;
-      if (demand <= 0 && supply <= 0) continue;
+      // A price cannot be discovered from transactions when nobody offers
+      // the good. Scarcity is already reflected in marginal sale income for
+      // career changes, so do not compound reference prices on zero volume.
+      if (demand <= 0 || supply <= 1e-9) continue;
 
       this.prices[good] = priceMultiplier(
         this.prices[good],
