@@ -712,8 +712,18 @@ export class World {
 
       let anyRequest = false;
 
-      for (const buyer of buyers) {
-        const decisions = decidePurchases(buyer, offers);
+      for (let buyerIndex = 0; buyerIndex < buyers.length; buyerIndex++) {
+        const buyer = buyers[buyerIndex];
+        // Equal-price offers were always visited in agent-ID order, so every
+        // buyer requested the same seller first. Rotate tie order per buyer to
+        // spread requests across sellers in the same clearing round.
+        const offset = offers.length
+          ? Math.floor(buyerIndex * offers.length / Math.max(1, buyers.length))
+          : 0;
+        const buyerOffers = offset === 0
+          ? offers
+          : [...offers.slice(offset), ...offers.slice(0, offset)];
+        const decisions = decidePurchases(buyer, buyerOffers);
         if (decisions.length > 0) anyRequest = true;
         requestsByHuman.set(buyer.id, decisions);
 
