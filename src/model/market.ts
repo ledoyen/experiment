@@ -99,7 +99,9 @@ export function listForSale(
   if (listed <= 1e-12) return 0;
 
   human.forSale[good] = currentListed + listed;
-  human.askPrices[good] = price;
+  // The supplied price is a validation/fallback hint, not an explicit ask.
+  // Keep explicit askPrices untouched; absent an override, the market uses
+  // the current reference price when offers are built.
   return listed;
 }
 
