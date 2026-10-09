@@ -67,6 +67,20 @@ describe("simulation behavioral invariants", () => {
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
   });
 
+  it("keeps the monetized population alive through the initial nutrition cycle", () => {
+    const world = testWorld({
+      ...defaultParameters(),
+      population: 200,
+      initialMoney: 100,
+      moneyEnabled: true,
+      mobility: 0.2,
+      productivityVariance: 0.2
+    });
+
+    const populations = runDays(world, 60);
+    expect(populations.every(population => population === 200)).toBe(true);
+  });
+
   it("keeps prices and population metrics finite", () => {
     const world = testWorld({
       ...defaultParameters(),
@@ -97,6 +111,22 @@ describe("simulation behavioral invariants", () => {
         expect(Number.isFinite(price)).toBe(true);
         expect(price).toBeGreaterThan(0);
       }
+    }
+  });
+
+  it("lists initial durable food stocks when money is enabled from the start", () => {
+    const world = testWorld({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 100,
+      moneyEnabled: true,
+      mobility: 0
+    });
+
+    for (const human of world.agents) {
+      expect(human.inventory.ble ?? 0).toBeGreaterThan(0);
+      expect(human.forSale.ble ?? 0).toBeCloseTo(human.inventory.ble ?? 0, 10);
+      expect(human.referencePricedAsks?.ble).toBe(true);
     }
   });
 
@@ -167,6 +197,74 @@ describe("simulation behavioral invariants", () => {
       3 * 1000,
       10
     );
+  });
+
+  it("consumes purchased food once instead of retaining it for a second nutrition pass", () => {
+    const world = testWorld({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 1000,
+      moneyEnabled: true,
+      mobility: 0
+    });
+    const [seller, buyer, other] = world.agents;
+
+    for (const human of world.agents) {
+      human.job = "idle";
+      human.inventory = {};
+      human.forSale = {};
+      human.askPrices = {};
+      human.referencePricedAsks = {};
+    }
+
+    seller.money = 0;
+    seller.inventory.ble = 1000;
+    seller.forSale.ble = 1000;
+    seller.askPrices.ble = 1;
+    buyer.money = 1000;
+    buyer.inventory = {};
+    other.money = 0;
+
+    world.step(1440, 1440);
+
+    expect(buyer.inventory.ble ?? 0).toBeCloseTo(0, 10);
+    expect(seller.inventory.ble ?? 0).toBeLessThan(1000);
+  });
+
+  it("refreshes model-generated asking prices but preserves explicit seller prices", () => {
+    const world = testWorld({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 1000,
+      moneyEnabled: true,
+      mobility: 0
+    });
+    const [generatedSeller, explicitSeller, buyer] = world.agents;
+
+    for (const human of world.agents) {
+      human.job = "idle";
+      human.inventory = {};
+      human.forSale = {};
+      human.askPrices = {};
+      human.referencePricedAsks = {};
+    }
+
+    generatedSeller.inventory.ble = 100;
+    generatedSeller.forSale.ble = 100;
+    generatedSeller.askPrices.ble = 999;
+    generatedSeller.referencePricedAsks!.ble = true;
+
+    explicitSeller.inventory.ble = 100;
+    explicitSeller.forSale.ble = 100;
+    explicitSeller.askPrices.ble = 2;
+
+    buyer.money = 1000;
+    world.prices.ble = 5;
+
+    world.step(1440, 1440);
+
+    expect(generatedSeller.askPrices.ble).toBe(5);
+    expect(explicitSeller.askPrices.ble).toBe(2);
   });
 
   it("changes market prices no more than once per simulation day", () => {
