@@ -435,6 +435,33 @@ export class World {
         // Allocate food labour before production so a shortage can change output today.
         collectivePlans = this.planCollectiveFoodDemand();
         this.reallocateCollectiveFoodWork(collectivePlans);
+      } else {
+        // In a monetary economy, profit-only career choices can ignore people
+        // whose purchasing power has collapsed. If physiology shows a real
+        // nutritional deficit, temporarily prioritize the food activities
+        // needed to meet population-wide nutrient demand before production.
+        const emergencyFoodReallocation = this.agents.some(agent =>
+          nutritionStatus(agent.nutritionDeficitDays).level === "deficient" ||
+          (agent.reserves.energy.max > 0 &&
+            agent.reserves.energy.value / agent.reserves.energy.max <= 0.45)
+        );
+        if (emergencyFoodReallocation) {
+          const equalPrices = Object.fromEntries(
+            FOOD_GOODS.map(good => [good, 1])
+          ) as Partial<Record<Good, number>>;
+          const nutritionalPlans = this.agents.map(agent =>
+            planFoodDemand(
+              agent.reserves,
+              agent.sex,
+              agent.state,
+              Number.MAX_SAFE_INTEGER,
+              equalPrices,
+              undefined,
+              agent.metabolicFactor
+            )
+          );
+          this.reallocateCollectiveFoodWork(nutritionalPlans);
+        }
       }
 
       this.produceForDay(simulationDay);
