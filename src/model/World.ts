@@ -458,7 +458,7 @@ export class World {
       if (!this.parameters.moneyEnabled) {
         // Allocate food labour before production so a shortage can change output today.
         collectivePlans = this.planCollectiveFoodDemand();
-        this.reallocateCollectiveFoodWork(collectivePlans);
+        this.reallocateCollectiveFoodWork(collectivePlans, simulationDay);
       }
 
       this.produceForDay(simulationDay);
@@ -496,7 +496,8 @@ export class World {
 
       const production =
         dailyOutputPerWorker(activity) *
-        agent.productivity;
+        agent.productivity *
+        seasonalProductionMultiplier(activity.job, simulationDay);
 
       if (!Number.isFinite(production) || production <= 0) continue;
 
@@ -1156,20 +1157,36 @@ export class World {
     // Preserve existing food producers first. Add the lowest-productivity
     // non-food workers only where projected supply misses a nutrient target.
     // Ranking uses the sourced food composition and activity capacities.
+    // Use high-capacity workers first: this meets the physical food constraint
+    // with fewer reassignments and prevents underproductive food jobs from
+    // becoming a poverty trap. Candidate order and projected output now agree.
     const candidates = this.agents
       .filter(agent => {
         const activity = activityByJob(agent.job);
         return !activity || activity.dormant || !FOOD_GOODS.includes(activity.output);
       })
-      .sort((left, right) => left.productivity - right.productivity);
-    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
+      .sort((left, right) => right.productivity - left.productivity);
+    const jobOutputMultipliers = Object.fromEntries(
+      ACTIVITIES.map(activity => [
+        activity.job,
+        seasonalProductionMultiplier(activity.job, simulationDay)
+      ])
+    ) as Partial<Record<Job, number>>;
+    const rankedJobs = rankFoodJobsByNutrientShortage(
+      demand,
+      stock,
+      candidates.length,
+      candidates.map(candidate => candidate.productivity),
+      jobOutputMultipliers
+    );
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
     }
   }
 
   private reallocateCollectiveFoodWork(
-    plans: Array<Partial<Record<Good, number>>>
+    plans: Array<Partial<Record<Good, number>>>,
+    simulationDay: number
   ) {
     const demand = {} as Partial<Record<NutritionId, number>>;
     const stock = {} as Partial<Record<NutritionId, number>>;
@@ -1202,7 +1219,8 @@ export class World {
       // so the shortage detector does not react one day too late.
       const activity = activityByJob(agent.job);
       if (!activity || activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
-      const expectedOutput = dailyOutputPerWorker(activity) * agent.productivity;
+      const expectedOutput = dailyOutputPerWorker(activity) * agent.productivity *
+        seasonalProductionMultiplier(activity.job, simulationDay);
       const food = FOOD_NUTRITION[activity.output];
       if (!food || !Number.isFinite(expectedOutput) || expectedOutput <= 0) continue;
       const nutrients = foodToNutrition(food, expectedOutput, activity.output);
@@ -1217,7 +1235,19 @@ export class World {
     const candidates = [...this.agents].sort(
       (left, right) => right.productivity - left.productivity
     );
-    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
+    const jobOutputMultipliers = Object.fromEntries(
+      ACTIVITIES.map(activity => [
+        activity.job,
+        seasonalProductionMultiplier(activity.job, simulationDay)
+      ])
+    ) as Partial<Record<Job, number>>;
+    const rankedJobs = rankFoodJobsByNutrientShortage(
+      demand,
+      stock,
+      candidates.length,
+      candidates.map(candidate => candidate.productivity),
+      jobOutputMultipliers
+    );
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
     }
