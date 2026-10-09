@@ -459,10 +459,6 @@ export class World {
         // Allocate food labour before production so a shortage can change output today.
         collectivePlans = this.planCollectiveFoodDemand();
         this.reallocateCollectiveFoodWork(collectivePlans);
-      } else {
-        // Meet physical nutritional requirements before production, independent
-        // of which households can currently afford food.
-        this.reallocateMarketFoodWork(simulationDay);
       }
 
       this.produceForDay(simulationDay);
