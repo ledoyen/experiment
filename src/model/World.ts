@@ -5,6 +5,7 @@ import {
   descendingIntoCritical,
   careerReviewDelayMinutes,
   careerReviewIsUrgent,
+  EMERGENCY_CAREER_ENERGY_RATIO,
   heatingConsumptionForDay,
   heatingPurchaseNeed,
   dailyMaintenanceNeed,
@@ -957,11 +958,15 @@ export class World {
       const energyReserve = agent.reserves.energy;
       const energyRatio =
         energyReserve.max > 0 ? energyReserve.value / energyReserve.max : 0;
+      const deficientNutrients = nutritionStatus(agent.nutritionDeficitDays).deficient;
+      const survivalEmergency =
+        energyRatio <= EMERGENCY_CAREER_ENERGY_RATIO ||
+        deficientNutrients.length > 0;
       const urgentReview = careerReviewIsUrgent(
         agent.money,
         plannedFoodSpend,
         energyRatio
-      ) || nutritionStatus(agent.nutritionDeficitDays).level === "deficient";
+      ) || survivalEmergency;
 
       if (currentMinute < agent.nextJobReviewMinute && !urgentReview) continue;
 
@@ -977,12 +982,11 @@ export class World {
         }
       }
 
-      if (urgentReview) {
+      if (survivalEmergency) {
         // Survival needs take precedence over expected revenue during an
         // emergency review. Choose a food activity that best covers energy
         // and the nutrients this individual is currently deficient in.
-        const deficient = nutritionStatus(agent.nutritionDeficitDays).deficient;
-        const required = [...new Set<NutritionId>(["energy", ...deficient])];
+        const required = [...new Set<NutritionId>(["energy", ...deficientNutrients])];
         let bestCoverage = -1;
         for (const activity of ACTIVITIES) {
           if (activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
