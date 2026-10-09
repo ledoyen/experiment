@@ -173,6 +173,12 @@ export class World {
       };
     });
 
+    // Make initial durable food stocks available to buyers when the market
+    // starts enabled, matching the false-to-true transition behavior.
+    if (this.parameters.moneyEnabled) {
+      this.exposeExistingInventoryToMarket();
+    }
+
     this.capture();
   }
 
@@ -574,11 +580,14 @@ export class World {
     for (const good of FOOD_GOODS) latentFoodDemand[good] = 0;
 
     for (const agent of this.agents) {
+      // Labour and reference prices must reflect physiological food needs,
+      // not only the purchasing power left after earlier market transactions.
+      // Actual purchases remain constrained by each buyer's real balance.
       const latent = planFoodDemand(
         agent.reserves,
         agent.sex,
         agent.state,
-        agent.money,
+        Number.MAX_SAFE_INTEGER,
         prices,
         undefined,
         agent.metabolicFactor
