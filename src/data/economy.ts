@@ -151,14 +151,37 @@ type FoodActivityOutput = {
 export function rankFoodJobsByNutrientShortage(
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>,
-  workerCount = 1
+  workerCount = 1,
+  workerProductivities: readonly number[] = [],
+  jobOutputMultipliers: Partial<Record<Job, number>> = {}
 ): Job[] {
   const options = foodActivityOutputs();
   const result: Job[] = [];
   const projected = { ...stock };
   for (let i = 0; i < workerCount && options.length; i++) {
     if (minimumNutritionCoverage(demand, projected) >= 1) break;
-    const best = bestFoodActivity(options, demand, projected);
+
+    // Production is linear in worker productivity. Rank each candidate using
+    // their actual capacity and the activity's seasonal output multiplier,
+    // rather than assuming every assigned worker produces exactly one unit.
+    const productivity = Number.isFinite(workerProductivities[i])
+      ? Math.max(0, workerProductivities[i])
+      : 1;
+    const scaledOptions = options.map(option => {
+      const outputMultiplier = jobOutputMultipliers[option.activity.job] ?? 1;
+      const factor = productivity * outputMultiplier;
+      return {
+        activity: option.activity,
+        output: Object.fromEntries(
+          NUTRITION.map(nutrient => [
+            nutrient.id,
+            (option.output[nutrient.id] ?? 0) * factor
+          ])
+        ) as Partial<Record<NutritionId, number>>
+      };
+    });
+
+    const best = bestFoodActivity(scaledOptions, demand, projected);
     if (!best) break;
     result.push(best.activity.job);
     addWorkerNutrition(projected, best.output);
@@ -220,7 +243,7 @@ function minimumNutritionCoverage(
 }
 
 // Selects the food activity that best addresses the nutrients currently below their daily targets.
-// This is a pure physical matching rule: no price, productivity or tuning coefficient is used.
+// The assignment accounts for the candidate's actual productivity and sourced seasonal output profile.
 function nutrientOutput(activity: ActivityDefinition) {
   const food = FOOD_NUTRITION[activity.output];
   return food ? foodToNutrition(food, dailyOutputPerWorker(activity), activity.output) : {};
