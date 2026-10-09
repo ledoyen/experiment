@@ -14,6 +14,7 @@ import {
   foodToNutrition,
   targetFor,
   applyNutritionDay,
+  type NutritionId,
   type NutritionReserves
 } from "../nutrition";
 import type {
