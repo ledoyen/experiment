@@ -63,6 +63,8 @@ export interface DeathRecord {
   causes: NutritionId[];
   reserves: Partial<Record<NutritionId, number>>;
   deficitDays: Partial<Record<NutritionId, number>>;
+  inventory: Partial<Record<Good, number>>;
+  forSale: Partial<Record<Good, number>>;
 }
 
 export class World {
@@ -1418,7 +1420,9 @@ this.removeDeadAgents();
           reserves: Object.fromEntries(
             NUTRITION.map(nutrient => [nutrient.id, agent.reserves[nutrient.id].value])
           ),
-          deficitDays: { ...agent.nutritionDeficitDays }
+          deficitDays: { ...agent.nutritionDeficitDays },
+          inventory: { ...agent.inventory },
+          forSale: { ...agent.forSale }
         });
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
