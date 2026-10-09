@@ -78,6 +78,9 @@ export interface Human {
   inventory: Partial<Record<Good, number>>;
   forSale: Partial<Record<Good, number>>;
   askPrices: Partial<Record<Good, number>>;
+  // Marks offers whose asking price follows the model's reference market price.
+  // Explicit seller prices remain independent.
+  referencePricedAsks?: Partial<Record<Good, boolean>>;
 
   events: AgentEvent[];
   nextJobReviewMinute: number;
