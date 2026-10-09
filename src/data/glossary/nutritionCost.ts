@@ -7,7 +7,11 @@
  *
  * This is only a price-unit calibration; it does not constrain choices.
  */
-import { NUTRITION, createNutritionReserves } from "../nutrition";
+import {
+  INITIAL_RESERVE_MIN_RATIO,
+  NUTRITION,
+  createNutritionReserves
+} from "../nutrition";
 import { planFoodDemand } from "./foodDemand";
 import type { Good, PhysiologyState, Sex } from "../types";
 
@@ -19,7 +23,13 @@ export function costOfNutritionallyCompleteDiet(
   state: PhysiologyState,
   rawPrices: Partial<Record<Good, number>>
 ): number {
-  const reserves = createNutritionReserves(sex, state);
+  // Calibrate for the lowest reserve ratio used at initialization, since
+  // the daily demand planner includes gradual replenishment of depleted stores.
+  const reserves = createNutritionReserves(
+    sex,
+    state,
+    INITIAL_RESERVE_MIN_RATIO
+  );
   const prices = Object.fromEntries(
     Object.entries(rawPrices).filter(([, price]) =>
       Number.isFinite(price) && price > 0
