@@ -76,6 +76,7 @@ export class World {
   private runInitialParameters: Parameters;
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
+  private foodEmergencyActive = false;
   private readonly deathCauses: Partial<Record<NutritionId, number>> = {};
 
   constructor(parameters: Parameters, options: WorldOptions = {}) {
@@ -90,6 +91,7 @@ export class World {
     this.prices = { ...INITIAL_PRICE };
     this.moneySupplyTarget = this.parameters.population * this.parameters.initialMoney;
     this.monetaryReserve = 0;
+    this.foodEmergencyActive = false;
     this.history.length = 0;
     this.snapshots.length = 0;
     this.parameterEvents.length = 0;
@@ -445,7 +447,7 @@ export class World {
           (agent.reserves.energy.max > 0 &&
             agent.reserves.energy.value / agent.reserves.energy.max <= 0.45)
         );
-        if (emergencyFoodReallocation) {
+        if (emergencyFoodReallocation && !this.foodEmergencyActive) {
           const equalPrices = Object.fromEntries(
             FOOD_GOODS.map(good => [good, 1])
           ) as Partial<Record<Good, number>>;
@@ -461,6 +463,9 @@ export class World {
             )
           );
           this.reallocateCollectiveFoodWork(nutritionalPlans);
+          this.foodEmergencyActive = true;
+        } else if (!emergencyFoodReallocation) {
+          this.foodEmergencyActive = false;
         }
       }
 
