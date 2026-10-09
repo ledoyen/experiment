@@ -174,9 +174,13 @@ export function decidePurchases(
             );
         }
 
-        for (const nutrient of NUTRITION) {
-          const need = needs[nutrient.id];
-          const supplied = contribution[nutrient.id] ?? 0;
+        // Limit this offer only by the nutrients in the active priority tier.
+        // Applying later-tier micronutrients here makes the planner repeatedly
+        // consume large quantities of a staple to supply trace nutrients that
+        // should be covered by the later, diversified part of the ration.
+        for (const nutrientId of tier) {
+          const need = needs[nutrientId as TierId];
+          const supplied = contribution[nutrientId as TierId] ?? 0;
           if (need > 1e-9 && supplied > 0) {
             maxUsefulQuantity = Math.min(maxUsefulQuantity, need / supplied);
           }
