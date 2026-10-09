@@ -54,6 +54,17 @@ export interface WorldOptions {
   recordSnapshots?: boolean;
 }
 
+export interface DeathRecord {
+  minute: number;
+  day: number;
+  agentId: number;
+  job: Job;
+  money: number;
+  causes: NutritionId[];
+  reserves: Partial<Record<NutritionId, number>>;
+  deficitDays: Partial<Record<NutritionId, number>>;
+}
+
 export class World {
   readonly width = 1800;
   readonly height = 1100;
@@ -78,6 +89,7 @@ export class World {
   private moneySupplyTarget = 0;
   private monetaryReserve = 0;
   private readonly deathCauses: Partial<Record<NutritionId, number>> = {};
+  private readonly deathLog: DeathRecord[] = [];
 
   constructor(parameters: Parameters, options: WorldOptions = {}) {
     this.recordSnapshots = options.recordSnapshots ?? true;
@@ -94,6 +106,10 @@ export class World {
     this.history.length = 0;
     this.snapshots.length = 0;
     this.parameterEvents.length = 0;
+    this.deathLog.length = 0;
+    for (const nutrient of Object.keys(this.deathCauses) as NutritionId[]) {
+      delete this.deathCauses[nutrient];
+    }
     this.runInitialParameters = structuredClone(this.parameters);
 
     const referenceCounts = new Map<Job, number>();
@@ -169,6 +185,7 @@ export class World {
         ),
         forSale: {},
         askPrices: {},
+        referencePricedAsks: {},
         events: [],
         nextJobReviewMinute: careerReviewDelayMinutes(Math.random())
       };
@@ -220,12 +237,16 @@ export class World {
         const stock = Math.max(0, human.inventory[good] ?? 0);
         if (stock <= 1e-12) continue;
 
-        listForSale(
+        const listed = listForSale(
           human,
           good,
           stock,
           this.prices[good]
         );
+        if (listed > 0) {
+          human.referencePricedAsks ??= {};
+          human.referencePricedAsks[good] = true;
+        }
       }
     }
   }
@@ -436,6 +457,10 @@ export class World {
         // Allocate food labour before production so a shortage can change output today.
         collectivePlans = this.planCollectiveFoodDemand();
         this.reallocateCollectiveFoodWork(collectivePlans);
+      } else {
+        // Meet physical nutritional requirements before production, independent
+        // of which households can currently afford food.
+        this.reallocateMarketFoodWork(simulationDay);
       }
 
       this.produceForDay(simulationDay);
@@ -481,14 +506,15 @@ export class World {
       agent.inventory[good] = (agent.inventory[good] ?? 0) + production;
 
       const existingAsk = agent.askPrices[good];
-      listForSale(
-        agent,
-        good,
-        production,
-        Number.isFinite(existingAsk) && existingAsk! > 0
-          ? existingAsk!
-          : this.prices[good]
-      );
+      const followsReferencePrice = agent.referencePricedAsks?.[good] === true;
+      const askPrice = followsReferencePrice || !Number.isFinite(existingAsk) || existingAsk! <= 0
+        ? this.prices[good]
+        : existingAsk!;
+      const listed = listForSale(agent, good, production, askPrice);
+      if (listed > 0) {
+        agent.referencePricedAsks ??= {};
+        agent.referencePricedAsks[good] = true;
+      }
     }
   }
 
@@ -562,6 +588,15 @@ export class World {
     }
 
     const prices = { ...this.prices };
+
+    // Refresh only model-generated asks. Explicit seller prices remain untouched.
+    for (const agent of this.agents) {
+      for (const good of Object.keys(agent.referencePricedAsks ?? {}) as Good[]) {
+        if (agent.referencePricedAsks?.[good] && (agent.forSale[good] ?? 0) > 1e-12) {
+          agent.askPrices[good] = prices[good];
+        }
+      }
+    }
 
     // The market is a list of individual offers. The same good may therefore
     // exist several times at different prices and with different sellers.
@@ -657,6 +692,13 @@ export class World {
       }
 
       purchasedIntake.set(human.id, intake);
+
+      // Purchased food is consumed to satisfy today's planned ration. Remove
+      // the purchased quantity from inventory so it cannot be eaten twice.
+      human.inventory[good] = Math.max(
+        0,
+        (human.inventory[good] ?? 0) - quantity
+      );
     };
 
     const applyPurchasedNutrition = () => {
@@ -718,7 +760,10 @@ export class World {
           buyer,
           buyerOffers,
           true,
-          storedIntake.get(buyer.id) ?? {}
+          mergeNutritionIntake(
+            storedIntake.get(buyer.id) ?? {},
+            purchasedIntake.get(buyer.id) ?? {}
+          )
         );
         if (decisions.length > 0) anyRequest = true;
         requestsByHuman.set(buyer.id, decisions);
@@ -1077,7 +1122,75 @@ export class World {
     if (this.agents.length > 0 && Math.abs(residue) > 1e-9) {
       this.agents[this.agents.length - 1].money += residue;
     }
+
+    // Reapply the physical food-labour constraint after profit-based career
+    // choices so essential food production cannot be optimized away.
+    this.reallocateMarketFoodWork(simulationDay + 1);
   }
+
+  private reallocateMarketFoodWork(simulationDay: number) {
+    if (!this.parameters.moneyEnabled || this.agents.length === 0) return;
+
+    const demand = {} as Partial<Record<NutritionId, number>>;
+    const stock = {} as Partial<Record<NutritionId, number>>;
+
+    for (const agent of this.agents) {
+      const plan = planFoodDemand(
+        agent.reserves,
+        agent.sex,
+        agent.state,
+        Number.MAX_SAFE_INTEGER,
+        this.prices,
+        undefined,
+        agent.metabolicFactor
+      );
+      for (const good of FOOD_GOODS) {
+        const quantity = plan[good] ?? 0;
+        const food = FOOD_NUTRITION[good];
+        if (!food || quantity <= 0) continue;
+        const nutrients = foodToNutrition(food, quantity, good);
+        for (const nutrient of NUTRITION) {
+          demand[nutrient.id] = (demand[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+        }
+      }
+
+      for (const good of FOOD_GOODS) {
+        const quantity = agent.inventory[good] ?? 0;
+        const food = FOOD_NUTRITION[good];
+        if (!food || quantity <= 0) continue;
+        const nutrients = foodToNutrition(food, quantity, good);
+        for (const nutrient of NUTRITION) {
+          stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+        }
+      }
+
+      const activity = activityByJob(agent.job);
+      if (!activity || activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
+      const output = dailyOutputPerWorker(activity) * agent.productivity *
+        seasonalProductionMultiplier(activity.job, simulationDay);
+      const food = FOOD_NUTRITION[activity.output];
+      if (!food || !Number.isFinite(output) || output <= 0) continue;
+      const nutrients = foodToNutrition(food, output, activity.output);
+      for (const nutrient of NUTRITION) {
+        stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+      }
+    }
+
+    // Preserve existing food producers first. Add the lowest-productivity
+    // non-food workers only where projected supply misses a nutrient target.
+    // Ranking uses the sourced food composition and activity capacities.
+    const candidates = this.agents
+      .filter(agent => {
+        const activity = activityByJob(agent.job);
+        return !activity || activity.dormant || !FOOD_GOODS.includes(activity.output);
+      })
+      .sort((left, right) => left.productivity - right.productivity);
+    const rankedJobs = rankFoodJobsByNutrientShortage(demand, stock, candidates.length);
+    for (let index = 0; index < rankedJobs.length; index++) {
+      candidates[index].job = rankedJobs[index];
+    }
+  }
+
   private reallocateCollectiveFoodWork(
     plans: Array<Partial<Record<Good, number>>>
   ) {
@@ -1267,6 +1380,10 @@ this.removeDeadAgents();
     return { ...this.deathCauses };
   }
 
+  getDeathLog(): DeathRecord[] {
+    return structuredClone(this.deathLog);
+  }
+
   private removeDeadAgents() {
     const survivors: Human[] = [];
 
@@ -1291,6 +1408,18 @@ this.removeDeadAgents();
         for (const nutrient of causes) {
           this.deathCauses[nutrient] = (this.deathCauses[nutrient] ?? 0) + 1;
         }
+        this.deathLog.push({
+          minute: this.minute,
+          day: Math.floor(this.minute / 1440),
+          agentId: agent.id,
+          job: agent.job,
+          money: Number.isFinite(agent.money) ? agent.money : 0,
+          causes,
+          reserves: Object.fromEntries(
+            NUTRITION.map(nutrient => [nutrient.id, agent.reserves[nutrient.id].value])
+          ),
+          deficitDays: { ...agent.nutritionDeficitDays }
+        });
         this.monetaryReserve += Number.isFinite(agent.money) ? agent.money : 0;
       } else {
         survivors.push(agent);
