@@ -937,13 +937,17 @@ export class World {
         }
       }
 
+      // Emergency reviews exist to prevent a delayed career response from
+      // turning a food-budget or health crisis into an irreversible death.
+      // Apply the best viable switch immediately during an urgent review;
+      // retain probabilistic mobility for ordinary career changes.
       if (
         bestJob !== agent.job &&
-        Math.random() < jobSwitchProbability(
+        (urgentReview || Math.random() < jobSwitchProbability(
           current,
           best,
           this.parameters.mobility
-        )
+        ))
       ) {
         const previousJob = agent.job;
         const previousIncome = current;
