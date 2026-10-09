@@ -3,9 +3,30 @@ import { buildAnalysisCsv } from "./analysis/buildAnalysisCsv";
 import { buildFinalAgentsCsv } from "./analysis/buildFinalAgentsCsv";
 import { defaultParameters } from "./data/defaults";
 import type { Good, Parameters } from "./data/types";
-import { World } from "./model/World";
+import { World, type DeathRecord } from "./model/World";
 
 const MINUTES_PER_DAY = 1440;
+
+function csvCell(value: string | number): string {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+function buildDeathLogCsv(records: DeathRecord[]): string {
+  const headers = [
+    "minute", "day", "agent_id", "job", "money", "causes", "reserves", "deficit_days"
+  ];
+  const rows = records.map(record => [
+    record.minute,
+    record.day,
+    record.agentId,
+    record.job,
+    record.money,
+    record.causes.join(";"),
+    JSON.stringify(record.reserves),
+    JSON.stringify(record.deficitDays)
+  ]);
+  return [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\n") + "\n";
+}
 
 interface CliOptions {
   output: string;
@@ -120,10 +141,15 @@ function run(options: CliOptions): void {
     "utf8"
   );
 
+  const deathLogOutput = options.output.endsWith(".csv")
+    ? options.output.replace(/\.csv$/i, "-deaths.csv")
+    : `${options.output}-deaths.csv`;
+  writeFileSync(deathLogOutput, buildDeathLogCsv(world.getDeathLog()), "utf8");
+
   const metrics = world.getMetrics();
   console.log(
     `Simulation finished: day ${options.durationDays}, population ${metrics.population}, ` +
-    `money ${metrics.moneySupply}, outputs ${options.output} and ${finalAgentsOutput}`
+    `money ${metrics.moneySupply}, outputs ${options.output}, ${finalAgentsOutput}, and ${deathLogOutput}`
   );
   console.log("Death causes:", JSON.stringify(world.getDeathCauses()));
 }
