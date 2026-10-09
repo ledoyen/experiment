@@ -850,83 +850,95 @@ export class World {
       );
     }
 
-    // Heating has a physical stock target and is bought from the cheapest
-    // individual offers after food has been settled.
-    for (const buyer of buyers) {
-      const desiredHeating = heatingPurchaseNeed(
-        simulationDay,
-        buyer.inventory.chauffage ?? 0
-      );
-
-      if (desiredHeating <= 0) continue;
-
-      const heatingDecisions = decideCheapestPurchases(
-        buyer,
-        offers,
-        "chauffage",
-        desiredHeating
-      );
-
-      for (const decision of heatingDecisions) {
-        const seller = agentsById.get(decision.sellerId);
-        const offer = offersByKey.get(
-          decision.name + ":" + decision.sellerId + ":" + decision.price
+    // Clear heating, clothing and tool markets in shared rounds. This uses
+    // the same pro-rata matching principle as food purchases, so low agent IDs
+    // and offer iteration order cannot capture all sales at identical prices.
+    for (const good of ["chauffage" as Good, ...MAINTENANCE_GOODS]) {
+      const remainingDemand = new Map<number, number>();
+      for (const buyer of buyers) {
+        remainingDemand.set(
+          buyer.id,
+          good === "chauffage"
+            ? heatingPurchaseNeed(simulationDay, buyer.inventory.chauffage ?? 0)
+            : dailyMaintenanceNeed(good as "vetement" | "outil")
         );
-
-        if (!seller || !offer) continue;
-
-        const executed = executePurchase(
-          buyer,
-          seller,
-          offer,
-          decision.quantity
-        );
-
-        if (executed <= 0) continue;
-
-        tradeVolume[decision.name] =
-          (tradeVolume[decision.name] ?? 0) + executed;
-        tradeValue[decision.name] =
-          (tradeValue[decision.name] ?? 0) +
-          executed * decision.price;
       }
 
-      for (const good of MAINTENANCE_GOODS) {
-        const decisions = decideCheapestPurchases(
-          buyer,
-          offers,
-          good,
-          dailyMaintenanceNeed(good)
-        );
+      for (let round = 0; round < MAX_FOOD_PURCHASE_ROUNDS; round++) {
+        const requestsByOffer = new Map<AvailableGood, Array<{
+          human: Human;
+          decision: ReturnType<typeof decideCheapestPurchases>[number];
+        }>>();
+        let anyRequest = false;
 
-        for (const decision of decisions) {
-          const seller = this.agents.find(
-            human => human.id === decision.sellerId
-          );
-          const offer = offers.find(
-            candidate =>
-              candidate.name === decision.name &&
-              candidate.sellerId === decision.sellerId &&
-              Math.abs(candidate.price - decision.price) < 1e-12
-          );
+        for (let buyerIndex = 0; buyerIndex < buyers.length; buyerIndex++) {
+          const buyer = buyers[buyerIndex];
+          const remaining = remainingDemand.get(buyer.id) ?? 0;
+          if (remaining <= 1e-12 || buyer.money <= 1e-12) continue;
 
-          if (!seller || !offer) continue;
-
-          const executed = executePurchase(
+          // Rotate within equal-price offer groups, preserving price priority.
+          const buyerOffers = offerGroups
+            .filter(group => group[0].name === good)
+            .flatMap(group => {
+              if (group.length < 2) return group;
+              const offset = buyerIndex % group.length;
+              return offset === 0
+                ? group
+                : [...group.slice(offset), ...group.slice(0, offset)];
+            });
+          const decisions = decideCheapestPurchases(
             buyer,
-            seller,
-            offer,
-            decision.quantity
+            buyerOffers,
+            good,
+            remaining
           );
+          if (decisions.length > 0) anyRequest = true;
 
-          if (executed <= 0) continue;
-
-          tradeVolume[decision.name] =
-            (tradeVolume[decision.name] ?? 0) + executed;
-          tradeValue[decision.name] =
-            (tradeValue[decision.name] ?? 0) +
-            executed * decision.price;
+          for (const decision of decisions) {
+            const offer = offersByKey.get(
+              decision.name + ":" + decision.sellerId + ":" + decision.price
+            );
+            if (!offer) continue;
+            const requests = requestsByOffer.get(offer) ?? [];
+            requests.push({ human: buyer, decision });
+            requestsByOffer.set(offer, requests);
+          }
         }
+
+        if (!anyRequest) break;
+
+        let anyTrade = false;
+        for (const [offer, requests] of requestsByOffer) {
+          const totalRequested = requests.reduce(
+            (sum, request) => sum + request.decision.quantity,
+            0
+          );
+          if (totalRequested <= 1e-12 || offer.stock <= 1e-12) continue;
+          const rationing = Math.min(1, offer.stock / totalRequested);
+
+          for (const request of requests) {
+            const seller = agentsById.get(offer.sellerId);
+            if (!seller) continue;
+            const executed = executePurchase(
+              request.human,
+              seller,
+              offer,
+              request.decision.quantity * rationing
+            );
+            if (executed <= 0) continue;
+
+            anyTrade = true;
+            remainingDemand.set(
+              request.human.id,
+              Math.max(0, (remainingDemand.get(request.human.id) ?? 0) - executed)
+            );
+            tradeVolume[good] = (tradeVolume[good] ?? 0) + executed;
+            tradeValue[good] =
+              (tradeValue[good] ?? 0) + executed * offer.price;
+          }
+        }
+
+        if (!anyTrade) break;
       }
     }
 
