@@ -436,6 +436,26 @@ export class World {
         // Allocate food labour before production so a shortage can change output today.
         collectivePlans = this.planCollectiveFoodDemand();
         this.reallocateCollectiveFoodWork(collectivePlans);
+      } else {
+        // Monetary prices alone can suppress demand from people who have
+        // become insolvent. Keep enough food-producing capacity to meet the
+        // population's physiological needs, counting production rather than
+        // privately held inventory as the daily supply signal.
+        const equalPrices = Object.fromEntries(
+          FOOD_GOODS.map(good => [good, 1])
+        ) as Partial<Record<Good, number>>;
+        const nutritionalPlans = this.agents.map(agent =>
+          planFoodDemand(
+            agent.reserves,
+            agent.sex,
+            agent.state,
+            Number.MAX_SAFE_INTEGER,
+            equalPrices,
+            undefined,
+            agent.metabolicFactor
+          )
+        );
+        this.reallocateCollectiveFoodWork(nutritionalPlans, false);
       }
 
       this.produceForDay(simulationDay);
@@ -1080,7 +1100,10 @@ export class World {
       this.agents[this.agents.length - 1].money += residue;
     }
   }
-  private reallocateCollectiveFoodWork(plans: Array<Partial<Record<Good, number>>>) {
+  private reallocateCollectiveFoodWork(
+    plans: Array<Partial<Record<Good, number>>>,
+    includeInventoryStock = true
+  ) {
     const demand = {} as Partial<Record<NutritionId, number>>;
     const stock = {} as Partial<Record<NutritionId, number>>;
 
@@ -1097,13 +1120,15 @@ export class World {
     }
 
     for (const agent of this.agents) {
-      for (const good of FOOD_GOODS) {
-        const quantity = agent.inventory[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+      if (includeInventoryStock) {
+        for (const good of FOOD_GOODS) {
+          const quantity = agent.inventory[good] ?? 0;
+          const food = FOOD_NUTRITION[good];
+          if (!food || quantity <= 0) continue;
+          const nutrients = foodToNutrition(food, quantity, good);
+          for (const nutrient of NUTRITION) {
+            stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+          }
         }
       }
 
