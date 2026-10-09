@@ -964,9 +964,18 @@ export class World {
       const energyRatio =
         energyReserve.max > 0 ? energyReserve.value / energyReserve.max : 0;
       const deficientNutrients = nutritionStatus(agent.nutritionDeficitDays).deficient;
+      const lowestReserveNutrient = NUTRITION
+        .map(nutrient => ({
+          id: nutrient.id,
+          ratio: agent.reserves[nutrient.id].value /
+            Math.max(1e-9, agent.reserves[nutrient.id].max)
+        }))
+        .filter(item => item.ratio < INITIAL_RESERVE_MIN_RATIO - 1e-9)
+        .sort((left, right) => left.ratio - right.ratio)[0]?.id;
       const survivalEmergency =
         energyRatio <= EMERGENCY_CAREER_ENERGY_RATIO ||
-        deficientNutrients.length > 0;
+        deficientNutrients.length > 0 ||
+        lowestReserveNutrient !== undefined;
       const urgentReview = careerReviewIsUrgent(
         agent.money,
         plannedFoodSpend,
@@ -999,7 +1008,7 @@ export class World {
               (agent.nutritionDeficitDays[priority] ?? 0)
               ? nutrientId
               : priority,
-          null
+          lowestReserveNutrient ?? null
         );
         const required = [...new Set<NutritionId>([
           "energy",
