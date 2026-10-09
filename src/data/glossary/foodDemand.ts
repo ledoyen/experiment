@@ -90,10 +90,17 @@ function initialNeeds(human: Human) {
 export function decidePurchases(
   human: Human,
   market: readonly AvailableGood[],
-  offersAreSorted = false
+  offersAreSorted = false,
+  alreadyConsumed: Partial<Record<NutritionId, number>> = {}
 ): PurchaseDecision[] {
   const decisions: PurchaseDecision[] = [];
   const needs = initialNeeds(human);
+  for (const nutrient of NUTRITION) {
+    needs[nutrient.id] = Math.max(
+      0,
+      needs[nutrient.id] - (alreadyConsumed[nutrient.id] ?? 0)
+    );
+  }
   const workingMarket = market
     .filter(offer =>
       offer.sellerId !== human.id &&
