@@ -1000,9 +1000,22 @@ export class World {
 
       if (survivalEmergency) {
         // Survival needs take precedence over expected revenue during an
-        // emergency review. Choose a food activity that best covers energy
-        // and the nutrients this individual is currently deficient in.
-        const required = [...new Set<NutritionId>(["energy", ...deficientNutrients])];
+        // emergency review. Prioritize the longest-running nutrient deficit
+        // alongside energy, rather than requiring one food to cover every
+        // simultaneous shortfall at once.
+        const priorityNutrient = deficientNutrients.reduce<NutritionId | null>(
+          (priority, nutrientId) =>
+            priority === null ||
+            (agent.nutritionDeficitDays[nutrientId] ?? 0) >
+              (agent.nutritionDeficitDays[priority] ?? 0)
+              ? nutrientId
+              : priority,
+          null
+        );
+        const required = [...new Set<NutritionId>([
+          "energy",
+          ...(priorityNutrient ? [priorityNutrient] : [])
+        ])];
         let bestCoverage = -1;
         for (const activity of ACTIVITIES) {
           if (activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
