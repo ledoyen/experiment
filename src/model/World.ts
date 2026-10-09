@@ -577,13 +577,26 @@ export class World {
     }
 
     const latentFoodDemand = {} as Record<Good, number>;
-    for (const good of FOOD_GOODS) latentFoodDemand[good] = 0;
+    const laborFoodDemand = {} as Record<Good, number>;
+    for (const good of FOOD_GOODS) {
+      latentFoodDemand[good] = 0;
+      laborFoodDemand[good] = 0;
+    }
 
     for (const agent of this.agents) {
-      // Labour and reference prices must reflect physiological food needs,
-      // not only the purchasing power left after earlier market transactions.
-      // Actual purchases remain constrained by each buyer's real balance.
-      const latent = planFoodDemand(
+      const affordableDemand = planFoodDemand(
+        agent.reserves,
+        agent.sex,
+        agent.state,
+        agent.money,
+        prices,
+        undefined,
+        agent.metabolicFactor
+      );
+      // Career decisions must account for unmet physiological need even when
+      // a person can no longer afford food. Price formation still uses
+      // solvent demand, and actual purchases remain balance-limited.
+      const nutritionalDemand = planFoodDemand(
         agent.reserves,
         agent.sex,
         agent.state,
@@ -594,8 +607,8 @@ export class World {
       );
 
       for (const good of FOOD_GOODS) {
-        latentFoodDemand[good] =
-          (latentFoodDemand[good] ?? 0) + (latent[good] ?? 0);
+        latentFoodDemand[good] += affordableDemand[good] ?? 0;
+        laborFoodDemand[good] += nutritionalDemand[good] ?? 0;
       }
     }
 
@@ -866,7 +879,7 @@ export class World {
     }
 
     // Professional mobility uses today's scarcity and actual sale prices.
-    const dailyDemand = { ...latentFoodDemand } as Record<Good, number>;
+    const dailyDemand = { ...laborFoodDemand } as Record<Good, number>;
     dailyDemand.chauffage = this.agents.reduce(
       (sum, agent) => sum + heatingPurchaseNeed(
         simulationDay,
