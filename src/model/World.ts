@@ -583,17 +583,6 @@ export class World {
 
     const prices = { ...this.prices };
 
-    // Listings created earlier carry an ask price. Refresh these generated
-    // asks from the current reference price so stale startup prices do not
-    // prevent scarcity signals from reaching buyers and career decisions.
-    for (const agent of this.agents) {
-      for (const good of Object.keys(agent.forSale) as Good[]) {
-        if ((agent.forSale[good] ?? 0) > 1e-12) {
-          agent.askPrices[good] = prices[good];
-        }
-      }
-    }
-
     // The market is a list of individual offers. The same good may therefore
     // exist several times at different prices and with different sellers.
     const offers = buildAvailableGoods(this.agents, prices);
