@@ -714,7 +714,12 @@ export class World {
             ? group
             : [...group.slice(offset), ...group.slice(0, offset)];
         });
-        const decisions = decidePurchases(buyer, buyerOffers, true);
+        const decisions = decidePurchases(
+          buyer,
+          buyerOffers,
+          true,
+          storedIntake.get(buyer.id) ?? {}
+        );
         if (decisions.length > 0) anyRequest = true;
         requestsByHuman.set(buyer.id, decisions);
 
