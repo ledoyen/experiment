@@ -565,6 +565,22 @@ export class World {
     // The market is a list of individual offers. The same good may therefore
     // exist several times at different prices and with different sellers.
     const offers = buildAvailableGoods(this.agents, prices);
+    const sortedOffers = [...offers].sort((left, right) =>
+      left.name.localeCompare(right.name) || left.price - right.price
+    );
+    const offerGroups: AvailableGood[][] = [];
+    for (const offer of sortedOffers) {
+      const group = offerGroups[offerGroups.length - 1];
+      if (
+        group &&
+        group[0].name === offer.name &&
+        group[0].price === offer.price
+      ) {
+        group.push(offer);
+      } else {
+        offerGroups.push([offer]);
+      }
+    }
     const agentsById = new Map(this.agents.map(agent => [agent.id, agent]));
     const offersByKey = new Map(
       offers.map(offer => [offer.name + ":" + offer.sellerId + ":" + offer.price, offer])
@@ -688,15 +704,16 @@ export class World {
       for (let buyerIndex = 0; buyerIndex < buyers.length; buyerIndex++) {
         const buyer = buyers[buyerIndex];
         // Equal-price offers were always visited in agent-ID order, so every
-        // buyer requested the same seller first. Rotate tie order per buyer to
-        // spread requests across sellers in the same clearing round.
-        const offset = offers.length
-          ? Math.floor(buyerIndex * offers.length / Math.max(1, buyers.length))
-          : 0;
-        const buyerOffers = offset === 0
-          ? offers
-          : [...offers.slice(offset), ...offers.slice(0, offset)];
-        const decisions = decidePurchases(buyer, buyerOffers);
+        // buyer requested the same seller first. Rotate only within equal-price
+        // groups to spread requests without changing price priority.
+        const buyerOffers = offerGroups.flatMap(group => {
+          if (group.length < 2) return group;
+          const offset = buyerIndex % group.length;
+          return offset === 0
+            ? group
+            : [...group.slice(offset), ...group.slice(0, offset)];
+        });
+        const decisions = decidePurchases(buyer, buyerOffers, true);
         if (decisions.length > 0) anyRequest = true;
         requestsByHuman.set(buyer.id, decisions);
 
