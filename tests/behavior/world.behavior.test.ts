@@ -8,8 +8,10 @@ import {
 import {
   FOOD_NUTRITION,
   NUTRITION,
+  NUTRITION_MORTALITY,
   createNutritionReserves,
-  foodToNutrition
+  foodToNutrition,
+  targetFor
 } from "../../src/data/nutrition";
 import { planFoodDemand } from "../../src/data/glossary/foodDemand";
 import { World } from "../../src/model/World";
@@ -43,6 +45,34 @@ describe("simulation behavioral invariants", () => {
     );
 
     expect(jobs).toEqual(["horticulture_legumes"]);
+  });
+
+  it("assigns a critically depleted individual to a nutrient-replenishing food job", () => {
+    const world = testWorld({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 100,
+      moneyEnabled: true,
+      mobility: 0
+    });
+    const agent = world.agents[0];
+    agent.job = "élevage_lait";
+    agent.money = 0;
+    agent.nutritionDeficitDays = { vitamin_C: 1, vitamin_K: 1 };
+
+    for (const nutrientId of ["vitamin_C", "vitamin_K"] as const) {
+      const nutrient = NUTRITION.find(item => item.id === nutrientId)!;
+      const criticalDays = NUTRITION_MORTALITY[nutrientId].criticalReserveDays;
+      agent.reserves[nutrientId].value =
+        targetFor(nutrient, agent.sex, agent.state) *
+        agent.metabolicFactor *
+        criticalDays / 2;
+    }
+
+    world.step(1440, 1440);
+
+    expect(world.agents.find(item => item.id === agent.id)?.job)
+      .toBe("horticulture_legumes");
   });
 
   it("keeps the planned food basket within one day's energy requirement", () => {
