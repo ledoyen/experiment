@@ -159,13 +159,15 @@ export function decidePurchases(
         let benefit = 0;
         let maxUsefulQuantity = Number.POSITIVE_INFINITY;
 
-        for (const nutrientId of tier) {
-          const need = needs[nutrientId as TierId];
+        // Score each food against every unmet nutritional requirement, not
+        // only the current tier. Otherwise a calorie-efficient staple can win
+        // the macro pass while providing none of the vitamins that become
+        // lethal deficiencies later. Quantity limits remain tier-specific below.
+        for (const nutrient of NUTRITION) {
+          const need = needs[nutrient.id];
           if (need <= 1e-9) continue;
-          const supplied = contribution[nutrientId] ?? 0;
+          const supplied = contribution[nutrient.id] ?? 0;
           if (supplied <= 0) continue;
-          const nutrient = NUTRITION.find(item => item.id === nutrientId);
-          if (!nutrient) continue;
 
           benefit +=
             Math.min(need, supplied) /
