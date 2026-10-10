@@ -94,7 +94,7 @@ describe("simulation behavioral invariants", () => {
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(160);
   });
 
-  it("keeps the monetized population alive through the initial nutrition cycle", () => {
+  it("keeps the monetized population alive through the first micronutrient mortality window", () => {
     const world = testWorld({
       ...defaultParameters(),
       population: 200,
@@ -104,7 +104,7 @@ describe("simulation behavioral invariants", () => {
       productivityVariance: 0.2
     });
 
-    const populations = runDays(world, 60);
+    const populations = runDays(world, 220);
     expect(populations.every(population => population === 200)).toBe(true);
   });
 
