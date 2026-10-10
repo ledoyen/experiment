@@ -1127,7 +1127,8 @@ export class World {
           targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor;
         const recovery = Math.max(0, reserve.max - reserve.value) /
           Math.max(1, reserve.maxDays);
-        demand[nutrient.id] = (demand[nutrient.id] ?? 0) + dailyTarget + recovery;
+        demand[nutrient.id] = (demand[nutrient.id] ?? 0) +
+          (dailyTarget + recovery) * (1 + INDIVIDUAL_REQUIREMENT_VARIANCE);
       }
     }
 
@@ -1153,126 +1154,26 @@ export class World {
       return right.productivity - left.productivity;
     });
 
-    // Allocate essential food jobs in aggregate-shortage order, while using
-    // personal reserve deficits only to break ties between equally effective
-    // activities. This preserves the population-level production mix and
-    // avoids assigning all complementary foods to people who already have them.
-    const foodActivities = ACTIVITIES.filter(activity =>
-      !activity.dormant && FOOD_GOODS.includes(activity.output) &&
-      dailyOutputPerWorker(activity) > 0
+    // Use the aggregate nutrient-shortage ranking for the food workforce.
+    // Household-level access is imperfect in the market, so demand includes a
+    // modest production buffer derived from the existing individual requirement
+    // variance; mortality thresholds and individual physiology remain unchanged.
+    const rankedJobs = rankFoodJobsByNutrientShortage(
+      demand,
+      {},
+      candidates.length,
+      candidates.map(candidate => candidate.productivity),
+      jobOutputMultipliers
     );
-    const projected = {} as Partial<Record<NutritionId, number>>;
-
-    const minimumCoverage = (
-      additional: Partial<Record<NutritionId, number>> = {}
-    ) => Math.min(...NUTRITION.map(nutrient => {
-      const need = demand[nutrient.id] ?? 0;
-      return need > 0
-        ? ((projected[nutrient.id] ?? 0) + (additional[nutrient.id] ?? 0)) / need
-        : 1;
-    }));
-
-    const totalCoverageGain = (
-      additional: Partial<Record<NutritionId, number>>
-    ) => NUTRITION.reduce((gain, nutrient) => {
-      const need = demand[nutrient.id] ?? 0;
-      if (need <= 0) return gain;
-      const current = Math.max(0, projected[nutrient.id] ?? 0) / need;
-      const after = Math.max(
-        0,
-        (projected[nutrient.id] ?? 0) + (additional[nutrient.id] ?? 0)
-      ) / need;
-      return gain + Math.min(1, after) - Math.min(1, current);
-    }, 0);
-
-    const personalCoverageFit = (
-      agent: Human,
-      output: Partial<Record<NutritionId, number>>
-    ) => NUTRITION.reduce((score, nutrient) => {
-      const reserve = agent.reserves[nutrient.id];
-      const reserveRatio = Math.max(
-        0,
-        Math.min(1, reserve.value / Math.max(1e-9, reserve.max))
-      );
-      const deficitDays = Math.max(
-        0,
-        agent.nutritionDeficitDays[nutrient.id] ?? 0
-      );
-      const urgency =
-        (1 - reserveRatio) +
-        Math.min(1, deficitDays / Math.max(1, nutrient.maxDays));
-      const dailyTarget =
-        targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor;
-      const coverage = Math.min(
-        1,
-        Math.max(0, output[nutrient.id] ?? 0) / Math.max(1e-9, dailyTarget)
-      );
-      return score + urgency * coverage;
-    }, 0);
-
-    let essentialFoodWorkerCount = 0;
-    while (
-      essentialFoodWorkerCount < candidates.length &&
-      minimumCoverage() < 1
-    ) {
-      const agent = candidates[essentialFoodWorkerCount];
-      let bestActivity: typeof foodActivities[number] | undefined;
-      let bestOutput: Partial<Record<NutritionId, number>> = {};
-      let bestMinimumCoverage = Number.NEGATIVE_INFINITY;
-      let bestTotalGain = Number.NEGATIVE_INFINITY;
-      let bestPersonalFit = Number.NEGATIVE_INFINITY;
-
-      for (const activity of foodActivities) {
-        const food = FOOD_NUTRITION[activity.output];
-        if (!food) continue;
-        const outputQuantity =
-          dailyOutputPerWorker(activity) *
-          agent.productivity *
-          seasonalProductionMultiplier(activity.job, simulationDay);
-        const nutrients = foodToNutrition(food, outputQuantity, activity.output);
-        const minCoverage = minimumCoverage(nutrients);
-        const gain = totalCoverageGain(nutrients);
-        const personalFit = personalCoverageFit(agent, nutrients);
-
-        // First optimize the least-covered population requirement, then total
-        // coverage. Individual nutrition only decides a genuine aggregate tie.
-        const betterMinimum =
-          minCoverage > bestMinimumCoverage + 1e-12;
-        const sameMinimum =
-          Math.abs(minCoverage - bestMinimumCoverage) <= 1e-12;
-        const betterTotal =
-          gain > bestTotalGain + 1e-12;
-        const sameTotal =
-          Math.abs(gain - bestTotalGain) <= 1e-12;
-
-        if (
-          !bestActivity ||
-          betterMinimum ||
-          (sameMinimum && betterTotal) ||
-          (sameMinimum && sameTotal && personalFit > bestPersonalFit + 1e-12)
-        ) {
-          bestActivity = activity;
-          bestOutput = nutrients;
-          bestMinimumCoverage = minCoverage;
-          bestTotalGain = gain;
-          bestPersonalFit = personalFit;
-        }
-      }
-
-      if (!bestActivity) break;
-      agent.job = bestActivity.job;
-      for (const nutrient of NUTRITION) {
-        projected[nutrient.id] =
-          (projected[nutrient.id] ?? 0) + (bestOutput[nutrient.id] ?? 0);
-      }
-      essentialFoodWorkerCount++;
+    for (let index = 0; index < rankedJobs.length; index++) {
+      candidates[index].job = rankedJobs[index];
     }
 
     // Reassign surplus food workers to activities with actual non-food demand.
     // This avoids permanently crowding out clothing, tools and heating after
     // the minimum nutritionally viable workforce has been selected.
     const surplusFoodWorkers = candidates
-      .slice(essentialFoodWorkerCount)
+      .slice(rankedJobs.length)
       .filter(agent => {
         const activity = activityByJob(agent.job);
         return activity && !activity.dormant && FOOD_GOODS.includes(activity.output);
