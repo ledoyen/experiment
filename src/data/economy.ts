@@ -220,16 +220,21 @@ function nutritionCoverageAfter(
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>
 ) {
-  let coverage = 1;
+  // Score the marginal fraction of each physiological requirement covered.
+  // A minimum-coverage score ties at zero whenever any nutrient has no source
+  // in one activity, causing the first activity in the list to win by default.
+  let coverageGain = 0;
   for (const nutrient of NUTRITION) {
     const need = demand[nutrient.id] ?? 0;
     if (need <= 0) continue;
-    coverage = Math.min(
-      coverage,
-      ((stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0)) / need
+    const current = Math.min(1, Math.max(0, stock[nutrient.id] ?? 0) / need);
+    const projected = Math.min(
+      1,
+      Math.max(0, (stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0)) / need
     );
+    coverageGain += projected - current;
   }
-  return coverage;
+  return coverageGain;
 }
 
 function minimumNutritionCoverage(
