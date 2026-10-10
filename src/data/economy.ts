@@ -203,6 +203,11 @@ function foodActivities() {
   );
 }
 
+type NutritionCoverageScore = {
+  minimumCoverage: number;
+  totalCoverageGain: number;
+};
+
 function bestFoodActivity(
   options: FoodActivityOutput[],
   demand: Partial<Record<NutritionId, number>>,
@@ -210,8 +215,20 @@ function bestFoodActivity(
 ) {
   return options.reduce<FoodActivityOutput | undefined>((best, option) => {
     if (!best) return option;
-    return nutritionCoverageAfter(option.output, demand, stock) >
-      nutritionCoverageAfter(best.output, demand, stock) ? option : best;
+
+    const candidateScore = nutritionCoverageAfter(option.output, demand, stock);
+    const bestScore = nutritionCoverageAfter(best.output, demand, stock);
+    const floorDifference = candidateScore.minimumCoverage - bestScore.minimumCoverage;
+
+    // First improve the least-covered nutrient. If that metric ties (often at
+    // zero while a nutrient has no source yet), use total marginal coverage to
+    // select a complementary food instead of whichever activity is listed first.
+    if (floorDifference > 1e-12) return option;
+    if (Math.abs(floorDifference) <= 1e-12 &&
+        candidateScore.totalCoverageGain > bestScore.totalCoverageGain + 1e-12) {
+      return option;
+    }
+    return best;
   }, undefined);
 }
 
@@ -219,22 +236,25 @@ function nutritionCoverageAfter(
   output: Partial<Record<NutritionId, number>>,
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>
-) {
-  // Score the marginal fraction of each physiological requirement covered.
-  // A minimum-coverage score ties at zero whenever any nutrient has no source
-  // in one activity, causing the first activity in the list to win by default.
-  let coverageGain = 0;
+): NutritionCoverageScore {
+  let minimumCoverage = 1;
+  let totalCoverageGain = 0;
+
   for (const nutrient of NUTRITION) {
     const need = demand[nutrient.id] ?? 0;
     if (need <= 0) continue;
-    const current = Math.min(1, Math.max(0, stock[nutrient.id] ?? 0) / need);
-    const projected = Math.min(
-      1,
-      Math.max(0, (stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0)) / need
-    );
-    coverageGain += projected - current;
+
+    const current = Math.max(0, stock[nutrient.id] ?? 0) / need;
+    const projected = Math.max(
+      0,
+      (stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0)
+    ) / need;
+
+    minimumCoverage = Math.min(minimumCoverage, projected);
+    totalCoverageGain += Math.min(1, projected) - Math.min(1, current);
   }
-  return coverageGain;
+
+  return { minimumCoverage, totalCoverageGain };
 }
 
 function minimumNutritionCoverage(
