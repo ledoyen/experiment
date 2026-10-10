@@ -1117,9 +1117,6 @@ export class World {
   private reallocateMarketFoodWork(simulationDay: number) {
     if (!this.parameters.moneyEnabled || this.agents.length === 0) return;
 
-    // Base labour requirements on physiological targets, not the food basket
-    // the current market planner can afford or compose. Using that basket as
-    // demand hides precisely the micronutrient shortages this allocator must fix.
     const demand = {} as Partial<Record<NutritionId, number>>;
     for (const nutrient of NUTRITION) demand[nutrient.id] = 0;
 
@@ -1134,20 +1131,40 @@ export class World {
       }
     }
 
-    // Plan the complete food-producing roster from zero daily output. Stored
-    // inventories bridge temporary shocks, but must not let the workforce
-    // stop producing vegetables, fruit or other foods needed every day.
-    // All existing food workers are eligible to change activity: otherwise an
-    // oversized dairy workforce can never move to a vitamin-rich crop.
-    const candidates = [...this.agents].sort(
-      (left, right) => right.productivity - left.productivity
+    // Individuals with no buying power cannot rely on market purchases to
+    // meet essential needs. Prioritize them for subsistence-producing jobs,
+    // then those with the longest nutritional deficits and lowest reserves.
+    const reserveRatio = (agent: Human) => Math.min(...NUTRITION.map(nutrient =>
+      agent.reserves[nutrient.id].value /
+        Math.max(1e-9, agent.reserves[nutrient.id].max)
+    ));
+    const longestDeficit = (agent: Human) => Math.max(
+      0,
+      ...Object.values(agent.nutritionDeficitDays).map(value => value ?? 0)
     );
+    const candidates = [...this.agents].sort((left, right) => {
+      const leftCannotBuy = left.money <= 1e-9 ? 1 : 0;
+      const rightCannotBuy = right.money <= 1e-9 ? 1 : 0;
+      if (leftCannotBuy !== rightCannotBuy) return rightCannotBuy - leftCannotBuy;
+      const deficitDifference = longestDeficit(right) - longestDeficit(left);
+      if (deficitDifference !== 0) return deficitDifference;
+      const reserveDifference = reserveRatio(left) - reserveRatio(right);
+      if (Math.abs(reserveDifference) > 1e-12) return reserveDifference;
+      return right.productivity - left.productivity;
+    });
+
     const jobOutputMultipliers = Object.fromEntries(
       ACTIVITIES.map(activity => [
         activity.job,
         seasonalProductionMultiplier(activity.job, simulationDay)
       ])
     ) as Partial<Record<Job, number>>;
+
+    // Plan the complete food-producing roster from zero daily output. Stored
+    // inventories bridge temporary shocks, but must not hide a recurring
+    // production deficit. All workers, including food workers, may change
+    // activities. Productivities are passed in the same priority order used
+    // to assign the resulting survival-critical jobs.
     const rankedJobs = rankFoodJobsByNutrientShortage(
       demand,
       {},
@@ -1158,6 +1175,74 @@ export class World {
 
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
+    }
+
+    // Reassign surplus food workers to activities with actual non-food demand.
+    // This avoids permanently crowding out clothing, tools and heating after
+    // the minimum nutritionally viable workforce has been selected.
+    const surplusFoodWorkers = candidates
+      .slice(rankedJobs.length)
+      .filter(agent => {
+        const activity = activityByJob(agent.job);
+        return activity && !activity.dormant && FOOD_GOODS.includes(activity.output);
+      })
+      .sort((left, right) => left.productivity - right.productivity);
+
+    const nonFoodActivities = ACTIVITIES.filter(activity =>
+      !activity.dormant && !FOOD_GOODS.includes(activity.output)
+    );
+    const nonFoodDemand = {} as Partial<Record<Good, number>>;
+    const projectedSupply = {} as Partial<Record<Good, number>>;
+
+    for (const activity of nonFoodActivities) {
+      const good = activity.output;
+      if (good === "chauffage") {
+        nonFoodDemand[good] = this.agents.reduce(
+          (sum, agent) => sum + heatingPurchaseNeed(
+            simulationDay,
+            agent.inventory.chauffage ?? 0
+          ),
+          0
+        );
+      } else if (MAINTENANCE_GOODS.includes(good as "vetement" | "outil")) {
+        nonFoodDemand[good] = dailyMaintenanceNeed(
+          good as "vetement" | "outil"
+        ) * this.agents.length;
+      } else {
+        nonFoodDemand[good] = 0;
+      }
+      projectedSupply[good] = this.agents.reduce(
+        (sum, agent) => sum + Math.min(
+          Math.max(0, agent.forSale[good] ?? 0),
+          Math.max(0, agent.inventory[good] ?? 0)
+        ),
+        0
+      );
+    }
+
+    for (const agent of surplusFoodWorkers) {
+      let bestActivity: typeof nonFoodActivities[number] | undefined;
+      let bestIncome = -1;
+      for (const activity of nonFoodActivities) {
+        const output = dailyOutputPerWorker(activity) * agent.productivity *
+          seasonalProductionMultiplier(activity.job, simulationDay);
+        const income = expectedMarginalIncome(
+          nonFoodDemand[activity.output] ?? 0,
+          projectedSupply[activity.output] ?? 0,
+          output,
+          this.prices[activity.output]
+        );
+        if (income > bestIncome) {
+          bestIncome = income;
+          bestActivity = activity;
+        }
+      }
+      if (!bestActivity) continue;
+      agent.job = bestActivity.job;
+      projectedSupply[bestActivity.output] =
+        (projectedSupply[bestActivity.output] ?? 0) +
+        dailyOutputPerWorker(bestActivity) * agent.productivity *
+        seasonalProductionMultiplier(bestActivity.job, simulationDay);
     }
   }
 
