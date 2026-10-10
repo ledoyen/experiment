@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultParameters } from "../../src/data/defaults";
 import {
-  ACTIVITIES,
   FOOD_GOODS,
   INITIAL_PRICE,
   activityByJob,
@@ -10,7 +9,6 @@ import {
 import {
   FOOD_NUTRITION,
   NUTRITION,
-  NUTRITION_MORTALITY,
   createNutritionReserves,
   foodToNutrition,
 } from "../../src/data/nutrition";
