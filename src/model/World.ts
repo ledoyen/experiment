@@ -1117,55 +1117,31 @@ export class World {
   private reallocateMarketFoodWork(simulationDay: number) {
     if (!this.parameters.moneyEnabled || this.agents.length === 0) return;
 
+    // Base labour requirements on physiological targets, not the food basket
+    // the current market planner can afford or compose. Using that basket as
+    // demand hides precisely the micronutrient shortages this allocator must fix.
     const demand = {} as Partial<Record<NutritionId, number>>;
-    const stock = {} as Partial<Record<NutritionId, number>>;
+    for (const nutrient of NUTRITION) demand[nutrient.id] = 0;
 
     for (const agent of this.agents) {
-      const plan = planFoodDemand(
-        agent.reserves,
-        agent.sex,
-        agent.state,
-        Number.MAX_SAFE_INTEGER,
-        this.prices,
-        undefined,
-        agent.metabolicFactor
-      );
-      for (const good of FOOD_GOODS) {
-        const quantity = plan[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          demand[nutrient.id] = (demand[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
-        }
-      }
-
-      // Count daily production, not accumulated inventories. Stored food can
-      // bridge a temporary shock, but it cannot satisfy a recurring daily need.
-      const activity = activityByJob(agent.job);
-      if (!activity || activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
-      const output = dailyOutputPerWorker(activity) * agent.productivity *
-        seasonalProductionMultiplier(activity.job, simulationDay);
-      const food = FOOD_NUTRITION[activity.output];
-      if (!food || !Number.isFinite(output) || output <= 0) continue;
-      const nutrients = foodToNutrition(food, output, activity.output);
       for (const nutrient of NUTRITION) {
-        stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+        const reserve = agent.reserves[nutrient.id];
+        const dailyTarget =
+          targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor;
+        const recovery = Math.max(0, reserve.max - reserve.value) /
+          Math.max(1, reserve.maxDays);
+        demand[nutrient.id] = (demand[nutrient.id] ?? 0) + dailyTarget + recovery;
       }
     }
 
-    // Preserve existing food producers first. Add the lowest-productivity
-    // non-food workers only where projected supply misses a nutrient target.
-    // Ranking uses the sourced food composition and activity capacities.
-    // Use high-capacity workers first: this meets the physical food constraint
-    // with fewer reassignments and prevents underproductive food jobs from
-    // becoming a poverty trap. Candidate order and projected output now agree.
-    const candidates = this.agents
-      .filter(agent => {
-        const activity = activityByJob(agent.job);
-        return !activity || activity.dormant || !FOOD_GOODS.includes(activity.output);
-      })
-      .sort((left, right) => right.productivity - left.productivity);
+    // Plan the complete food-producing roster from zero daily output. Stored
+    // inventories bridge temporary shocks, but must not let the workforce
+    // stop producing vegetables, fruit or other foods needed every day.
+    // All existing food workers are eligible to change activity: otherwise an
+    // oversized dairy workforce can never move to a vitamin-rich crop.
+    const candidates = [...this.agents].sort(
+      (left, right) => right.productivity - left.productivity
+    );
     const jobOutputMultipliers = Object.fromEntries(
       ACTIVITIES.map(activity => [
         activity.job,
@@ -1174,11 +1150,12 @@ export class World {
     ) as Partial<Record<Job, number>>;
     const rankedJobs = rankFoodJobsByNutrientShortage(
       demand,
-      stock,
+      {},
       candidates.length,
       candidates.map(candidate => candidate.productivity),
       jobOutputMultipliers
     );
+
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
     }
