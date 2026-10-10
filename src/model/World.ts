@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, targetFor, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, NUTRITION_MORTALITY, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, targetFor, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
@@ -1175,6 +1175,50 @@ export class World {
 
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
+    }
+
+    // Give an individual in a documented critical-reserve state a job that
+    // directly produces food for the nutrients they are running out of.
+    // This closes the gap between aggregate coverage and household access:
+    // the population can be adequately supplied in total while one household
+    // remains stuck producing milk or grain and cannot obtain vitamin-rich food.
+    for (const agent of this.agents) {
+      const criticalNeeds: Partial<Record<NutritionId, number>> = {};
+      for (const nutrient of NUTRITION) {
+        const criticalDays = NUTRITION_MORTALITY[nutrient.id].criticalReserveDays;
+        if (criticalDays <= 0) continue;
+        const reserve = agent.reserves[nutrient.id];
+        const criticalThreshold =
+          targetFor(nutrient, agent.sex, agent.state) *
+          agent.metabolicFactor *
+          criticalDays;
+        if (reserve.value <= criticalThreshold) {
+          criticalNeeds[nutrient.id] =
+            targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor +
+            Math.max(0, reserve.max - reserve.value) / Math.max(1, reserve.maxDays);
+        }
+      }
+      if (Object.keys(criticalNeeds).length === 0) continue;
+
+      const rescueJob = rankFoodJobsByNutrientShortage(
+        criticalNeeds,
+        {},
+        1,
+        [agent.productivity],
+        jobOutputMultipliers
+      )[0];
+      if (rescueJob && agent.job !== rescueJob) {
+        const previousJob = agent.job;
+        agent.job = rescueJob;
+        agent.events.push({
+          minute: this.minute,
+          type: "jobChange",
+          previousJob,
+          newJob: rescueJob,
+          previousIncome: 0,
+          expectedIncome: 0
+        });
+      }
     }
 
     // Reassign surplus food workers to activities with actual non-food demand.
