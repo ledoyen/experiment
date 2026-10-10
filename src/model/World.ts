@@ -1153,26 +1153,6 @@ export class World {
       return right.productivity - left.productivity;
     });
 
-    const jobOutputMultipliers = Object.fromEntries(
-      ACTIVITIES.map(activity => [
-        activity.job,
-        seasonalProductionMultiplier(activity.job, simulationDay)
-      ])
-    ) as Partial<Record<Job, number>>;
-
-    // Plan the complete food-producing roster from zero daily output. Stored
-    // inventories bridge temporary shocks, but must not hide a recurring
-    // production deficit. All workers, including food workers, may change
-    // activities. Productivities are passed in the same priority order used
-    // to assign the resulting survival-critical jobs.
-    const rankedJobs = rankFoodJobsByNutrientShortage(
-      demand,
-      {},
-      candidates.length,
-      candidates.map(candidate => candidate.productivity),
-      jobOutputMultipliers
-    );
-
     // Allocate essential food jobs in aggregate-shortage order, while using
     // personal reserve deficits only to break ties between equally effective
     // activities. This preserves the population-level production mix and
