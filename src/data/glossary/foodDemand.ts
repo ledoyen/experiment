@@ -170,13 +170,23 @@ export function decidePurchases(
           const nutrient = NUTRITION.find(item => item.id === nutrientId);
           if (!nutrient) continue;
 
+          const dailyTarget = Math.max(
+            1e-9,
+            targetFor(nutrient, human.sex, human.state) *
+              human.metabolicFactor
+          );
+          const reserve = human.reserves[nutrientId as NutritionId];
+          // A nutrient with few reserve-days remaining must outweigh several
+          // comfortable reserves. Without this urgency term, a broad staple
+          // can outscore a vitamin-C source while vitamin C is already empty.
+          // The weight is derived from the reserve's remaining days, capped
+          // naturally at the nutrient's full reserve duration.
+          const reserveUrgency = reserve.max > 0
+            ? reserve.max / Math.max(reserve.value, dailyTarget)
+            : 1;
+
           benefit +=
-            Math.min(need, supplied) /
-            Math.max(
-              1e-9,
-              targetFor(nutrient, human.sex, human.state) *
-                human.metabolicFactor
-            );
+            (Math.min(need, supplied) / dailyTarget) * reserveUrgency;
         }
 
         // Bound each purchase by the unmet nutrient it can cover most
