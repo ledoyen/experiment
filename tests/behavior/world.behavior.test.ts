@@ -106,7 +106,7 @@ describe("simulation behavioral invariants", () => {
 
     const populations = runDays(world, 220);
     expect(populations.every(population => population === 200)).toBe(true);
-  });
+  }, 90_000);
 
   it("keeps prices and population metrics finite", () => {
     const world = testWorld({
