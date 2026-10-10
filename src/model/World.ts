@@ -1173,8 +1173,60 @@ export class World {
       jobOutputMultipliers
     );
 
-    for (let index = 0; index < rankedJobs.length; index++) {
-      candidates[index].job = rankedJobs[index];
+    // Preserve the aggregate job mix, but assign each required food role to
+    // the people whose personal reserves most need that food's nutrients.
+    // A population can have enough vitamin-rich production in total while a
+    // milk-heavy or grain-heavy household still cannot afford complementary food.
+    const remainingFoodJobs = [...rankedJobs];
+    for (let index = 0; index < candidates.length && remainingFoodJobs.length > 0; index++) {
+      const agent = candidates[index];
+      let bestJobIndex = 0;
+      let bestFitScore = Number.NEGATIVE_INFINITY;
+
+      for (let jobIndex = 0; jobIndex < remainingFoodJobs.length; jobIndex++) {
+        const job = remainingFoodJobs[jobIndex];
+        const activity = activityByJob(job);
+        if (!activity) continue;
+        const food = FOOD_NUTRITION[activity.output];
+        if (!food) continue;
+
+        const output = dailyOutputPerWorker(activity) *
+          agent.productivity *
+          seasonalProductionMultiplier(job, simulationDay);
+        const produced = foodToNutrition(food, output, activity.output);
+        let fitScore = 0;
+
+        for (const nutrient of NUTRITION) {
+          const reserve = agent.reserves[nutrient.id];
+          const reserveRatio = Math.max(
+            0,
+            Math.min(1, reserve.value / Math.max(1e-9, reserve.max))
+          );
+          const deficitDays = Math.max(
+            0,
+            agent.nutritionDeficitDays[nutrient.id] ?? 0
+          );
+          const urgency =
+            (1 - reserveRatio) +
+            Math.min(1, deficitDays / Math.max(1, nutrient.maxDays));
+          const dailyTarget =
+            targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor;
+          const coverage = Math.min(
+            1,
+            Math.max(0, produced[nutrient.id] ?? 0) /
+              Math.max(1e-9, dailyTarget)
+          );
+          fitScore += urgency * coverage;
+        }
+
+        // Keep the aggregate ranking's order as the deterministic tie-breaker.
+        if (fitScore > bestFitScore + 1e-12) {
+          bestFitScore = fitScore;
+          bestJobIndex = jobIndex;
+        }
+      }
+
+      agent.job = remainingFoodJobs.splice(bestJobIndex, 1)[0];
     }
 
     // Reassign surplus food workers to activities with actual non-food demand.
