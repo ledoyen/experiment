@@ -1,5 +1,5 @@
 import { ACTIVITIES, ACTIVE_WORKER_SHARE, DURABLE_FOOD_GOODS, FOOD_GOODS, INITIAL_PRICE, activityByJob, dailyOutputPerWorker, initialFoodStockPerPerson, rankFoodJobsByNutrientShortage } from "../data/economy";
-import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, targetFor, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
+import { FOOD_NUTRITION, INITIAL_RESERVE_MIN_RATIO, INDIVIDUAL_REQUIREMENT_VARIANCE, NUTRITION, NUTRITION_MORTALITY, applyNutritionDay, createNutritionReserves, foodToNutrition, isLethalNutritionState, lethalNutritionCauses, mergeNutritionIntake, nutritionStatus, targetFor, updateNutritionDeficitDays, type NutritionId } from "../data/nutrition";
 import type { AvailableGood, Good, Human, Job, Metrics, ParameterChangeEvent, Parameters } from "../data/types";
 import {
   descendingIntoCritical,
@@ -1139,16 +1139,24 @@ export class World {
       agent.reserves[nutrient.id].value /
         Math.max(1e-9, agent.reserves[nutrient.id].max)
     ));
-    const longestDeficit = (agent: Human) => Math.max(
+    // Rank urgency by progress toward each nutrient's own lethal interval,
+    // not raw deficit duration. Long-lived nonlethal deficiencies must not
+    // outrank an agent nearing a fatal vitamin or energy deficit.
+    const lethalProgress = (agent: Human) => Math.max(
       0,
-      ...Object.values(agent.nutritionDeficitDays).map(value => value ?? 0)
+      ...NUTRITION.map(nutrient => {
+        const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;
+        if (lethalAfterDays === null) return 0;
+        return Math.max(0, agent.nutritionDeficitDays[nutrient.id] ?? 0) /
+          Math.max(1, lethalAfterDays);
+      })
     );
     const candidates = [...this.agents].sort((left, right) => {
       const leftCannotBuy = left.money <= 1e-9 ? 1 : 0;
       const rightCannotBuy = right.money <= 1e-9 ? 1 : 0;
       if (leftCannotBuy !== rightCannotBuy) return rightCannotBuy - leftCannotBuy;
-      const deficitDifference = longestDeficit(right) - longestDeficit(left);
-      if (deficitDifference !== 0) return deficitDifference;
+      const progressDifference = lethalProgress(right) - lethalProgress(left);
+      if (Math.abs(progressDifference) > 1e-12) return progressDifference;
       const reserveDifference = reserveRatio(left) - reserveRatio(right);
       if (Math.abs(reserveDifference) > 1e-12) return reserveDifference;
       return right.productivity - left.productivity;
