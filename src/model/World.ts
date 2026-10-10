@@ -1154,6 +1154,13 @@ export class World {
       return right.productivity - left.productivity;
     });
 
+    const jobOutputMultipliers = Object.fromEntries(
+      ACTIVITIES.map(activity => [
+        activity.job,
+        seasonalProductionMultiplier(activity.job, simulationDay)
+      ])
+    ) as Partial<Record<Job, number>>;
+
     // Use the aggregate nutrient-shortage ranking for the food workforce.
     // Household-level access is imperfect in the market, so demand includes a
     // modest production buffer derived from the existing individual requirement
