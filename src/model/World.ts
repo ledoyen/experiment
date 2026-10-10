@@ -1252,7 +1252,56 @@ export class World {
         seasonalProductionMultiplier(bestActivity.job, simulationDay);
     }
 
+    // A few agents can remain unable to buy complementary foods even when
+    // aggregate production is sufficient. Rescue only moneyless agents whose
+    // reserve is already depleted and whose deficit has crossed most of the
+    // existing lethal interval; this avoids the workforce-wide oscillation
+    // caused by reacting to every low reserve.
+    for (const agent of this.agents) {
+      if (agent.money > 1e-9) continue;
 
+      const criticalNeeds: Partial<Record<NutritionId, number>> = {};
+      for (const nutrient of NUTRITION) {
+        const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays;
+        if (lethalAfterDays === null) continue;
+
+        const deficitDays = Math.max(0, agent.nutritionDeficitDays[nutrient.id] ?? 0);
+        const reserve = agent.reserves[nutrient.id];
+        if (
+          deficitDays < lethalAfterDays * 0.75 ||
+          reserve.value > reserve.max * 0.5
+        ) {
+          continue;
+        }
+
+        criticalNeeds[nutrient.id] =
+          targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor +
+          Math.max(0, reserve.max - reserve.value) / Math.max(1, reserve.maxDays);
+      }
+
+      if (Object.keys(criticalNeeds).length === 0) continue;
+
+      const rescueJob = rankFoodJobsByNutrientShortage(
+        criticalNeeds,
+        {},
+        1,
+        [agent.productivity],
+        jobOutputMultipliers
+      )[0];
+
+      if (rescueJob && agent.job !== rescueJob) {
+        const previousJob = agent.job;
+        agent.job = rescueJob;
+        agent.events.push({
+          minute: this.minute,
+          type: "jobChange",
+          previousJob,
+          newJob: rescueJob,
+          previousIncome: 0,
+          expectedIncome: 0
+        });
+      }
+    }
   }
 
   private reallocateCollectiveFoodWork(
