@@ -53,12 +53,12 @@ export const MAX_FOOD_PURCHASE_ROUNDS = 16;
 // Source: https://www.fao.org/4/y5815e/y5815e0a.htm
 export const FOOD_PRIORITY_TIERS = [
   [
-    "protein", "carbohydrate", "fat", "fiber",
     "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3",
     "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C",
     "vitamin_E", "vitamin_K",
     "calcium", "iron", "magnesium", "zinc", "iodine", "selenium"
   ] as const,
+  ["protein", "carbohydrate", "fat", "fiber"] as const,
   ["energy"] as const
 ] as const;
 
@@ -159,9 +159,9 @@ export function decidePurchases(
         let benefit = 0;
         let maxUsefulQuantity = Number.POSITIVE_INFINITY;
 
-        // Evaluate all non-energy nutrients together so a food rich in a
-        // limiting vitamin can compete with a staple that covers more macros.
-        // The final energy tier remains separate and enforces the daily calorie budget.
+        // Solve nutritional constraints in stages: micronutrients first
+        // because only a subset of foods supplies each one, then macronutrients.
+        // The final energy tier fills calories without exceeding the daily target.
         for (const nutrientId of tier) {
           const need = needs[nutrientId as TierId];
           if (need <= 1e-9) continue;
@@ -179,9 +179,9 @@ export function decidePurchases(
             );
         }
 
-        // Choose a quantity that closes the most efficiently covered unmet
-        // nutrient instead of letting a tiny trace-nutrient gap cap every food.
-        // All other nutrient contributions still reduce their needs below.
+        // Bound each purchase by the unmet nutrient it can cover most
+        // efficiently. Contributions to other nutrients still reduce their
+        // needs, without letting a tiny trace requirement cap every food.
         let bestCoveragePerUnit = 0;
         for (const nutrientId of tier) {
           const need = needs[nutrientId as TierId];
