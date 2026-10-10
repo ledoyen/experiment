@@ -46,6 +46,39 @@ describe("simulation behavioral invariants", () => {
     expect(jobs).toEqual(["horticulture_legumes"]);
   });
 
+  it("plans vitamin-C-rich food when vitamin C reserves are depleted", () => {
+    const reserves = createNutritionReserves("male", "normal", 1);
+    reserves.vitamin_C.value = 0;
+    const equalPrices = Object.fromEntries(
+      FOOD_GOODS.map(good => [good, 1])
+    ) as Partial<Record<Good, number>>;
+    const stockCaps = Object.fromEntries(
+      FOOD_GOODS.map(good => [
+        good,
+        good === "ble" || good === "pomme_de_terre" ? 1000 : 0
+      ])
+    ) as Partial<Record<Good, number>>;
+
+    const basket = planFoodDemand(
+      reserves,
+      "male",
+      "normal",
+      Number.MAX_SAFE_INTEGER,
+      equalPrices,
+      stockCaps
+    );
+    const vitaminCIntake = FOOD_GOODS.reduce((total, good) => {
+      const food = FOOD_NUTRITION[good];
+      const quantity = basket[good] ?? 0;
+      return total + (food ? foodToNutrition(food, quantity, good).vitamin_C ?? 0 : 0);
+    }, 0);
+    const dailyVitaminCTarget =
+      NUTRITION.find(nutrient => nutrient.id === "vitamin_C")!.target.male;
+
+    expect(basket.pomme_de_terre ?? 0).toBeGreaterThan(0);
+    expect(vitaminCIntake).toBeGreaterThanOrEqual(dailyVitaminCTarget);
+  });
+
   it("rescues a moneyless agent nearing lethal vitamin C deficiency", () => {
     const world = testWorld({
       ...defaultParameters(),
