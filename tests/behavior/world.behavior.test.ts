@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { defaultParameters } from "../../src/data/defaults";
 import {
+  ACTIVITIES,
   FOOD_GOODS,
   INITIAL_PRICE,
+  activityByJob,
   rankFoodJobsByNutrientShortage
 } from "../../src/data/economy";
 import {
   FOOD_NUTRITION,
   NUTRITION,
+  NUTRITION_MORTALITY,
   createNutritionReserves,
   foodToNutrition,
 } from "../../src/data/nutrition";
@@ -43,6 +46,30 @@ describe("simulation behavioral invariants", () => {
     );
 
     expect(jobs).toEqual(["horticulture_legumes"]);
+  });
+
+  it("rescues a moneyless agent nearing lethal vitamin C deficiency", () => {
+    const world = testWorld({
+      ...defaultParameters(),
+      population: 3,
+      initialMoney: 100,
+      moneyEnabled: true,
+      mobility: 0
+    });
+    const agent = world.agents[0];
+    agent.job = "élevage_lait";
+    agent.money = 0;
+    agent.nutritionDeficitDays = { vitamin_C: 150 };
+    agent.reserves.vitamin_C.value = agent.reserves.vitamin_C.max * 0.25;
+
+    world.step(1440, 1440);
+
+    const survivor = world.agents.find(item => item.id === agent.id);
+    expect(survivor).toBeDefined();
+    const activity = survivor ? activityByJob(survivor.job) : undefined;
+    expect(activity).toBeDefined();
+    expect(activity && FOOD_NUTRITION[activity.output]?.vitamin_C).toBeGreaterThan(0);
+    expect(survivor?.job).not.toBe("élevage_lait");
   });
 
   it("keeps the planned food basket within one day's energy requirement", () => {
