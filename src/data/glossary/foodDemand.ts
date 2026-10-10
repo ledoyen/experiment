@@ -52,8 +52,8 @@ export const MAX_FOOD_PURCHASE_ROUNDS = 16;
 // sources cannot cause the planner to consume excessive quantities of one staple.
 // Source: https://www.fao.org/4/y5815e/y5815e0a.htm
 export const FOOD_PRIORITY_TIERS = [
-  ["protein", "carbohydrate", "fat", "fiber"] as const,
   [
+    "protein", "carbohydrate", "fat", "fiber",
     "vitamin_A", "vitamin_B1", "vitamin_B2", "vitamin_B3",
     "vitamin_B6", "vitamin_B9", "vitamin_B12", "vitamin_C",
     "vitamin_E", "vitamin_K",
@@ -159,15 +159,16 @@ export function decidePurchases(
         let benefit = 0;
         let maxUsefulQuantity = Number.POSITIVE_INFINITY;
 
-        // Score each food against every unmet nutritional requirement, not
-        // only the current tier. Otherwise a calorie-efficient staple can win
-        // the macro pass while providing none of the vitamins that become
-        // lethal deficiencies later. Quantity limits remain tier-specific below.
-        for (const nutrient of NUTRITION) {
-          const need = needs[nutrient.id];
+        // Evaluate all non-energy nutrients together so a food rich in a
+        // limiting vitamin can compete with a staple that covers more macros.
+        // The final energy tier remains separate and enforces the daily calorie budget.
+        for (const nutrientId of tier) {
+          const need = needs[nutrientId as TierId];
           if (need <= 1e-9) continue;
-          const supplied = contribution[nutrient.id] ?? 0;
+          const supplied = contribution[nutrientId as TierId] ?? 0;
           if (supplied <= 0) continue;
+          const nutrient = NUTRITION.find(item => item.id === nutrientId);
+          if (!nutrient) continue;
 
           benefit +=
             Math.min(need, supplied) /
@@ -178,15 +179,18 @@ export function decidePurchases(
             );
         }
 
-        // Limit this offer only by the nutrients in the active priority tier.
-        // Applying later-tier micronutrients here makes the planner repeatedly
-        // consume large quantities of a staple to supply trace nutrients that
-        // should be covered by the later, diversified part of the ration.
+        // Choose a quantity that closes the most efficiently covered unmet
+        // nutrient instead of letting a tiny trace-nutrient gap cap every food.
+        // All other nutrient contributions still reduce their needs below.
+        let bestCoveragePerUnit = 0;
         for (const nutrientId of tier) {
           const need = needs[nutrientId as TierId];
           const supplied = contribution[nutrientId as TierId] ?? 0;
-          if (need > 1e-9 && supplied > 0) {
-            maxUsefulQuantity = Math.min(maxUsefulQuantity, need / supplied);
+          if (need <= 1e-9 || supplied <= 0) continue;
+          const coveragePerUnit = supplied / need;
+          if (coveragePerUnit > bestCoveragePerUnit) {
+            bestCoveragePerUnit = coveragePerUnit;
+            maxUsefulQuantity = need / supplied;
           }
         }
 
