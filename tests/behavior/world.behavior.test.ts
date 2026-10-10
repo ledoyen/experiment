@@ -87,6 +87,10 @@ describe("simulation behavioral invariants", () => {
       moneyEnabled: true,
       mobility: 0
     });
+    // Keep every buyer insolvent throughout this one-day test so the
+    // focal agent remains moneyless when the post-market rescue rule runs.
+    for (const human of world.agents) human.money = 0;
+
     const agent = world.agents[0];
     agent.job = "élevage_lait";
     agent.money = 0;
