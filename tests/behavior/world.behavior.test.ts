@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { defaultParameters } from "../../src/data/defaults";
-import { FOOD_GOODS, INITIAL_PRICE } from "../../src/data/economy";
+import {
+  FOOD_GOODS,
+  INITIAL_PRICE,
+  rankFoodJobsByNutrientShortage
+} from "../../src/data/economy";
 import {
   FOOD_NUTRITION,
   NUTRITION,
@@ -29,6 +33,18 @@ function moneyInSystem(world: World): number {
 }
 
 describe("simulation behavioral invariants", () => {
+  it("assigns vegetable production when vitamin C and K are the limiting nutrients", () => {
+    const jobs = rankFoodJobsByNutrientShortage(
+      { vitamin_C: 1000, vitamin_K: 1000 },
+      {},
+      1,
+      [1],
+      {}
+    );
+
+    expect(jobs).toEqual(["horticulture_legumes"]);
+  });
+
   it("keeps the planned food basket within one day's energy requirement", () => {
     const reserves = createNutritionReserves("male", "normal", 1);
     const basket = planFoodDemand(
