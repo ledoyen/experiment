@@ -1217,8 +1217,7 @@ export class World {
       {},
       candidates.length,
       candidates.map(candidate => candidate.productivity),
-      jobOutputMultipliers,
-      this.currentNutrientUrgencies()
+      jobOutputMultipliers
     );
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
