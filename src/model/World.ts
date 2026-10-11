@@ -1114,6 +1114,45 @@ export class World {
     this.reallocateMarketFoodWork(simulationDay + 1);
   }
 
+  private currentNutrientUrgencies(): Partial<Record<NutritionId, number>> {
+    const urgencies: Partial<Record<NutritionId, number>> = {};
+
+    for (const nutrient of NUTRITION) {
+      if (NUTRITION_MORTALITY[nutrient.id].lethalAfterDays === null) {
+        urgencies[nutrient.id] = 1;
+        continue;
+      }
+
+      let totalUrgency = 0;
+      for (const agent of this.agents) {
+        const reserve = agent.reserves[nutrient.id];
+        const dailyTarget = Math.max(
+          1e-9,
+          targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor
+        );
+        const reserveDays = reserve.value / dailyTarget;
+        const criticalDays = Math.max(
+          1,
+          NUTRITION_MORTALITY[nutrient.id].criticalReserveDays
+        );
+        const reservePressure = reserve.maxDays /
+          Math.max(criticalDays, reserveDays, 1e-9);
+        const lethalAfterDays = NUTRITION_MORTALITY[nutrient.id].lethalAfterDays!;
+        const deficitProgress = Math.min(
+          1,
+          Math.max(0, agent.nutritionDeficitDays[nutrient.id] ?? 0) /
+            Math.max(1, lethalAfterDays)
+        );
+
+        totalUrgency += reservePressure * (1 + deficitProgress);
+      }
+
+      urgencies[nutrient.id] = totalUrgency / Math.max(1, this.agents.length);
+    }
+
+    return urgencies;
+  }
+
   private reallocateMarketFoodWork(simulationDay: number) {
     if (!this.parameters.moneyEnabled || this.agents.length === 0) return;
 
@@ -1178,7 +1217,8 @@ export class World {
       {},
       candidates.length,
       candidates.map(candidate => candidate.productivity),
-      jobOutputMultipliers
+      jobOutputMultipliers,
+      this.currentNutrientUrgencies()
     );
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
@@ -1286,7 +1326,8 @@ export class World {
         {},
         1,
         [agent.productivity],
-        jobOutputMultipliers
+        jobOutputMultipliers,
+        this.currentNutrientUrgencies()
       )[0];
 
       if (rescueJob && agent.job !== rescueJob) {
@@ -1403,7 +1444,8 @@ export class World {
       deliveredIntake,
       candidates.length,
       candidates.map(candidate => candidate.productivity),
-      jobOutputMultipliers
+      jobOutputMultipliers,
+      this.currentNutrientUrgencies()
     );
     for (let index = 0; index < rankedJobs.length; index++) {
       candidates[index].job = rankedJobs[index];
