@@ -46,6 +46,25 @@ describe("simulation behavioral invariants", () => {
     expect(jobs).toEqual(["horticulture_legumes"]);
   });
 
+  it("prioritizes vitamin C production when reserve pressure is critical", () => {
+    const jobs = rankFoodJobsByNutrientShortage(
+      {
+        energy: 480000,
+        protein: 8000,
+        vitamin_C: 22000,
+        vitamin_E: 2600,
+        vitamin_B12: 800
+      },
+      {},
+      1,
+      [1],
+      {},
+      { energy: 1, protein: 1, vitamin_C: 30, vitamin_E: 1, vitamin_B12: 1 }
+    );
+
+    expect(jobs).toEqual(["agriculture_pomme_de_terre"]);
+  });
+
   it("prioritizes lethal vitamin E deficiency over a non-lethal fat deficit", () => {
     const jobs = rankFoodJobsByNutrientShortage(
       {
