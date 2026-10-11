@@ -1,5 +1,5 @@
 import type { Good, Job } from "./types";
-import { FOOD_NUTRITION, NUTRITION, foodToNutrition, type NutritionId } from "./nutrition";
+import { FOOD_NUTRITION, NUTRITION, NUTRITION_MORTALITY, foodToNutrition, type NutritionId } from "./nutrition";
 import { initialPriceScale } from "./glossary/nutritionCost";
 
 export interface ActivityDefinition {
@@ -204,6 +204,8 @@ function foodActivities() {
 }
 
 type NutritionCoverageScore = {
+  minimumCriticalCoverage: number;
+  totalCriticalCoverageGain: number;
   minimumCoverage: number;
   totalCoverageGain: number;
 };
@@ -218,11 +220,20 @@ function bestFoodActivity(
 
     const candidateScore = nutritionCoverageAfter(option.output, demand, stock);
     const bestScore = nutritionCoverageAfter(best.output, demand, stock);
-    const floorDifference = candidateScore.minimumCoverage - bestScore.minimumCoverage;
+    const criticalFloorDifference =
+      candidateScore.minimumCriticalCoverage - bestScore.minimumCriticalCoverage;
 
-    // First improve the least-covered nutrient. If that metric ties (often at
-    // zero while a nutrient has no source yet), use total marginal coverage to
-    // select a complementary food instead of whichever activity is listed first.
+    // Cover nutrients with a documented lethal-duration rule before optimizing
+    // non-lethal nutrients. Otherwise a chronic fat deficit can keep attracting
+    // workers while the population runs out of vitamin C or vitamin E.
+    if (criticalFloorDifference > 1e-12) return option;
+    if (Math.abs(criticalFloorDifference) <= 1e-12 &&
+        candidateScore.totalCriticalCoverageGain >
+          bestScore.totalCriticalCoverageGain + 1e-12) {
+      return option;
+    }
+
+    const floorDifference = candidateScore.minimumCoverage - bestScore.minimumCoverage;
     if (floorDifference > 1e-12) return option;
     if (Math.abs(floorDifference) <= 1e-12 &&
         candidateScore.totalCoverageGain > bestScore.totalCoverageGain + 1e-12) {
@@ -237,6 +248,8 @@ function nutritionCoverageAfter(
   demand: Partial<Record<NutritionId, number>>,
   stock: Partial<Record<NutritionId, number>>
 ): NutritionCoverageScore {
+  let minimumCriticalCoverage = 1;
+  let totalCriticalCoverageGain = 0;
   let minimumCoverage = 1;
   let totalCoverageGain = 0;
 
@@ -249,12 +262,27 @@ function nutritionCoverageAfter(
       0,
       (stock[nutrient.id] ?? 0) + (output[nutrient.id] ?? 0)
     ) / need;
+    const currentCapped = Math.min(1, current);
+    const projectedCapped = Math.min(1, projected);
 
     minimumCoverage = Math.min(minimumCoverage, projected);
-    totalCoverageGain += Math.min(1, projected) - Math.min(1, current);
+    totalCoverageGain += projectedCapped - currentCapped;
+
+    if (NUTRITION_MORTALITY[nutrient.id].lethalAfterDays !== null) {
+      minimumCriticalCoverage = Math.min(
+        minimumCriticalCoverage,
+        projectedCapped
+      );
+      totalCriticalCoverageGain += projectedCapped - currentCapped;
+    }
   }
 
-  return { minimumCoverage, totalCoverageGain };
+  return {
+    minimumCriticalCoverage,
+    totalCriticalCoverageGain,
+    minimumCoverage,
+    totalCoverageGain
+  };
 }
 
 function minimumNutritionCoverage(
