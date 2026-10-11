@@ -205,6 +205,7 @@ function foodActivities() {
 }
 
 type NutritionCoverageScore = {
+  minimumCoverage: number;
   criticalCoverageGain: number;
   totalCoverageGain: number;
 };
@@ -215,6 +216,10 @@ function bestFoodActivity(
   stock: Partial<Record<NutritionId, number>>,
   nutrientUrgencies: Partial<Record<NutritionId, number>>
 ) {
+  const hasActiveUrgency = Object.values(nutrientUrgencies).some(
+    urgency => Number.isFinite(urgency) && (urgency ?? 0) > 0
+  );
+
   return options.reduce<FoodActivityOutput | undefined>((best, option) => {
     if (!best) return option;
 
@@ -225,17 +230,28 @@ function bestFoodActivity(
       best.output, demand, stock, nutrientUrgencies
     );
 
-    // Prioritize marginal coverage for nutrients with documented lethal
-    // deficits, weighted by current reserve pressure from the simulation.
-    // A minimum-coverage score can tie at zero for every candidate while a
-    // critical nutrient is missing; weighted marginal gain avoids that deadlock.
-    if (candidateScore.criticalCoverageGain >
-        bestScore.criticalCoverageGain + 1e-12) {
-      return option;
+    if (hasActiveUrgency) {
+      // The collective ration can use measured reserve pressure to prioritize
+      // a nutrient that is actually becoming lethal in the current population.
+      if (candidateScore.criticalCoverageGain >
+          bestScore.criticalCoverageGain + 1e-12) {
+        return option;
+      }
+      if (Math.abs(
+        candidateScore.criticalCoverageGain - bestScore.criticalCoverageGain
+      ) <= 1e-12 &&
+          candidateScore.totalCoverageGain > bestScore.totalCoverageGain + 1e-12) {
+        return option;
+      }
+      return best;
     }
-    if (Math.abs(
-      candidateScore.criticalCoverageGain - bestScore.criticalCoverageGain
-    ) <= 1e-12 &&
+
+    // Market production uses the general balanced-coverage objective. Applying
+    // population-specific lethal urgency here can over-specialize the workforce
+    // and starve other essential nutrients despite aggregate production.
+    const floorDifference = candidateScore.minimumCoverage - bestScore.minimumCoverage;
+    if (floorDifference > 1e-12) return option;
+    if (Math.abs(floorDifference) <= 1e-12 &&
         candidateScore.totalCoverageGain > bestScore.totalCoverageGain + 1e-12) {
       return option;
     }
@@ -249,6 +265,7 @@ function nutritionCoverageAfter(
   stock: Partial<Record<NutritionId, number>>,
   nutrientUrgencies: Partial<Record<NutritionId, number>>
 ): NutritionCoverageScore {
+  let minimumCoverage = 1;
   let criticalCoverageGain = 0;
   let totalCoverageGain = 0;
 
@@ -265,6 +282,7 @@ function nutritionCoverageAfter(
     const projectedCapped = Math.min(1, projected);
     const marginalCoverage = projectedCapped - currentCapped;
 
+    minimumCoverage = Math.min(minimumCoverage, projected);
     totalCoverageGain += marginalCoverage;
     if (NUTRITION_MORTALITY[nutrient.id].lethalAfterDays !== null) {
       const urgency = nutrientUrgencies[nutrient.id];
@@ -275,7 +293,7 @@ function nutritionCoverageAfter(
     }
   }
 
-  return { criticalCoverageGain, totalCoverageGain };
+  return { minimumCoverage, criticalCoverageGain, totalCoverageGain };
 }
 
 function minimumNutritionCoverage(
