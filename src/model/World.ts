@@ -1309,49 +1309,86 @@ export class World {
     simulationDay: number
   ) {
     const demand = {} as Partial<Record<NutritionId, number>>;
-    const stock = {} as Partial<Record<NutritionId, number>>;
+    const deliveredIntake = {} as Partial<Record<NutritionId, number>>;
+    const plannedFoodDemand = {} as Partial<Record<Good, number>>;
+    const projectedProduction = {} as Partial<Record<Good, number>>;
+
+    for (const nutrient of NUTRITION) {
+      demand[nutrient.id] = 0;
+      deliveredIntake[nutrient.id] = 0;
+    }
+    for (const good of FOOD_GOODS) {
+      plannedFoodDemand[good] = 0;
+      projectedProduction[good] = 0;
+    }
+
+    // Labour demand must be derived from physiological requirements, not the
+    // nutrient totals contained in the chosen basket. Otherwise a basket that
+    // misses vitamin E can redefine the demand as "enough" vitamin E.
+    for (const agent of this.agents) {
+      for (const nutrient of NUTRITION) {
+        const reserve = agent.reserves[nutrient.id];
+        const dailyTarget =
+          targetFor(nutrient, agent.sex, agent.state) * agent.metabolicFactor;
+        const recovery = Math.max(0, reserve.max - reserve.value) /
+          Math.max(1, reserve.maxDays);
+        demand[nutrient.id] = (demand[nutrient.id] ?? 0) + dailyTarget + recovery;
+      }
+    }
 
     for (const plan of plans) {
       for (const good of FOOD_GOODS) {
-        const quantity = plan[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          demand[nutrient.id] = (demand[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
-        }
+        plannedFoodDemand[good] =
+          (plannedFoodDemand[good] ?? 0) + Math.max(0, plan[good] ?? 0);
       }
     }
 
+    // Only the food the ration plan can actually deliver counts as today's
+    // nutrition supply. Aggregate inventory is a buffer, not intake: counting
+    // thousands of kilograms of wheat as today's vitamin-E supply hides the
+    // fact that the calorie cap prevents the population from eating it all.
+    // Include current workers' output because produceForDay runs before rationing.
     for (const agent of this.agents) {
-      for (const good of FOOD_GOODS) {
-        const quantity = agent.inventory[good] ?? 0;
-        const food = FOOD_NUTRITION[good];
-        if (!food || quantity <= 0) continue;
-        const nutrients = foodToNutrition(food, quantity, good);
-        for (const nutrient of NUTRITION) {
-          stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
-        }
-      }
-
-      // Production happens after labour allocation and before consumption.
-      // Include today's expected output from workers already assigned to food
-      // so the shortage detector does not react one day too late.
       const activity = activityByJob(agent.job);
       if (!activity || activity.dormant || !FOOD_GOODS.includes(activity.output)) continue;
-      const expectedOutput = dailyOutputPerWorker(activity) * agent.productivity *
+      const output = dailyOutputPerWorker(activity) * agent.productivity *
         seasonalProductionMultiplier(activity.job, simulationDay);
-      const food = FOOD_NUTRITION[activity.output];
-      if (!food || !Number.isFinite(expectedOutput) || expectedOutput <= 0) continue;
-      const nutrients = foodToNutrition(food, expectedOutput, activity.output);
-      for (const nutrient of NUTRITION) {
-        stock[nutrient.id] = (stock[nutrient.id] ?? 0) + (nutrients[nutrient.id] ?? 0);
+      if (Number.isFinite(output) && output > 0) {
+        projectedProduction[activity.output] =
+          (projectedProduction[activity.output] ?? 0) + output;
       }
     }
 
-    // When food is scarce, existing food workers must be able to switch crops
-    // or livestock as well. Restricting candidates to non-food workers can
-    // leave the workforce producing the wrong food indefinitely.
+    const deliveryFraction = {} as Partial<Record<Good, number>>;
+    for (const good of FOOD_GOODS) {
+      const planned = plannedFoodDemand[good] ?? 0;
+      const available = this.inventoryTotal(good) +
+        (projectedProduction[good] ?? 0);
+      deliveryFraction[good] = planned > 0
+        ? Math.min(1, available / planned)
+        : 0;
+    }
+
+    for (let index = 0; index < plans.length; index++) {
+      const plan = plans[index];
+      for (const good of FOOD_GOODS) {
+        const quantity = Math.max(0, plan[good] ?? 0) *
+          (deliveryFraction[good] ?? 0);
+        if (quantity <= 0) continue;
+        const food = FOOD_NUTRITION[good];
+        if (!food) continue;
+        const nutrients = foodToNutrition(food, quantity, good);
+        for (const nutrient of NUTRITION) {
+          deliveredIntake[nutrient.id] =
+            (deliveredIntake[nutrient.id] ?? 0) +
+            (nutrients[nutrient.id] ?? 0);
+        }
+      }
+    }
+
+    // Rank labour against the gap between physiological requirements and
+    // nutrition that can actually be delivered from the current ration.
+    // Never use the entire warehouse inventory as a substitute for daily intake.
     const candidates = [...this.agents].sort(
       (left, right) => right.productivity - left.productivity
     );
@@ -1363,7 +1400,7 @@ export class World {
     ) as Partial<Record<Job, number>>;
     const rankedJobs = rankFoodJobsByNutrientShortage(
       demand,
-      stock,
+      deliveredIntake,
       candidates.length,
       candidates.map(candidate => candidate.productivity),
       jobOutputMultipliers
