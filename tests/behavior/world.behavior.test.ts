@@ -75,7 +75,7 @@ describe("simulation behavioral invariants", () => {
       },
       {
         energy: 40000,
-        vitamin_C: 18000,
+        vitamin_C: 22000,
         vitamin_E: 0,
         fat: 0
       },
