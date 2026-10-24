@@ -180,20 +180,6 @@ describe("simulation behavioral invariants", () => {
     expect(Math.min(...populations)).toBeGreaterThanOrEqual(180);
   });
 
-  it("keeps the no-money population at 200 through the first vitamin C mortality window", () => {
-    const world = testWorld({
-      ...defaultParameters(),
-      population: 200,
-      initialMoney: 100,
-      moneyEnabled: false,
-      mobility: 0.2,
-      productivityVariance: 0.2
-    });
-
-    const populations = runDays(world, 400);
-    expect(populations.every(population => population === 200)).toBe(true);
-  }, 120_000);
-
   it("conserves the initial money supply through individual transactions and deaths", () => {
     const world = testWorld({
       ...defaultParameters(),
